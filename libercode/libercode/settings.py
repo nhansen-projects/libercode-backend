@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-t&gz-8w!o!3%*n3hbx%uwv0c449n-+)+6#9m++h-e5b2jf8j&e
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']  # Or specify: ['localhost', '127.0.0.1', '0.0.0.0']
 
 
 # Application definition
@@ -69,15 +69,20 @@ TEMPLATES = [
 WSGI_APPLICATION = 'libercode.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+# Database configuration
+import os
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('DB_NAME', 'notesDB'),
+        'USER': os.environ.get('DB_USER', 'admin'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'admin'),
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
     }
 }
+
 
 
 # Password validation
