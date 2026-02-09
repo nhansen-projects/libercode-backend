@@ -2,3 +2,4 @@ asgiref==3.11.0
 sqlparse==0.5.5
 Django==5.0.4
 psycopg2-binary==2.9.9
+pip
