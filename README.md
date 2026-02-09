@@ -16,18 +16,23 @@ This is the backend for the libercode project, built with Django.
    cd libercode-backend
    ```
 
-2. **Create and activate a virtual environment:**
+2. **Install pip**
+   ```bash
+   python get-pip.py
+   ```
+
+3. **Create and activate a virtual environment:**
    ```bash
    python3 -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. **Install dependencies:**
+4. **Install dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Navigate to the Django project directory:**
+5. **Navigate to the Django project directory:**
    ```bash
    cd libercode
    ```
