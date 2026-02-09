@@ -4,46 +4,39 @@ This is the backend for the libercode project, built with Django.
 
 ## Prerequisites
 
-- Python 3.10+
-- `pip` (Python package manager)
-- `venv` (Python virtual environment module)
+- Docker Desktop
+- Docker Compose
 
 ## Setup
 
 1. **Clone the repository:**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/nhansen-projects/libercode-backend
    cd libercode-backend
    ```
+
+2. **Ensure Docker Desktop is running**, then start the services:
+   ```bash
+   docker-compose up
+   ```
    
-2. **Create and activate a virtual environment:**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Navigate to the Django project directory:**
-   ```bash
-   cd libercode
-   ```
+   This will:
+   - Start PostgreSQL database (notesDB)
+   - Run Django migrations automatically
+   - Start the Django development server on `http://localhost:8000`
 
 ## Running the Project
 
-1. **Run migrations:**
-   ```bash
-   python manage.py migrate
-   ```
+```bash
+docker-compose up
+```
 
-2. **Start the development server:**
-   ```bash
-   python manage.py runserver
-   ```
-   The server will be available at `http://127.0.0.1:8000/`.
+The server will be available at `http://localhost:8000/`.
+
+To stop the services:
+```bash
+docker-compose down
+```
 
 ## Project Structure
 
