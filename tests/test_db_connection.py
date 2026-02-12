@@ -3,7 +3,9 @@ import sys
 import django
 
 # Add the project directory to the path
-sys.path.insert(0, '/home/nh/workspace/libercode-backend/libercode')
+import pathlib
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / 'libercode'))
 
 # Set up Django settings
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'libercode.settings')
