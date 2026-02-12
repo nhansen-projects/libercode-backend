@@ -1,5 +1,47 @@
 from django.conf import settings
 from django.db import models
+import secrets
+import datetime
+
+class AuthToken(models.Model):
+    """
+    authentication token model
+    """
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='auth_token'
+    )
+    token = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    
+    def __str__(self):
+        return f"Token for {self.user.username}"
+    
+    def is_valid(self):
+        return self.expires_at > datetime.datetime.now(datetime.timezone.utc)
+    
+    def extend(self):
+        self.expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+            seconds=settings.SIMPLE_AUTH['TOKEN_LIFETIME']
+        )
+        self.save()
+    
+    @classmethod
+    def generate_token(cls, user):
+        cls.objects.filter(user=user).delete()
+        
+        token = secrets.token_urlsafe(48)
+        expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+            seconds=settings.SIMPLE_AUTH['TOKEN_LIFETIME']
+        )
+        
+        return cls.objects.create(
+            user=user,
+            token=token,
+            expires_at=expires_at
+        )
 
 
 class Tag(models.Model):

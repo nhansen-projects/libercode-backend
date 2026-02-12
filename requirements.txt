@@ -1,5 +1,10 @@
 asgiref==3.11.0
 sqlparse==0.5.5
-Django==5.0.4
+Django==6.0.2
 psycopg2-binary==2.9.9
 pip
+djangorestframework==3.15.1
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.3.1
+django-filter==23.5
+drf-yasg==1.21.7

@@ -1,0 +1,36 @@
+{% extends "core/base.html" %}
+
+{% block title %}My Favorites - LiberCode{% endblock %}
+
+{% block content %}
+<h1>My Favorites</h1>
+
+{% if favorites %}
+    {% for favorite in favorites %}
+    <div class="entry-card">
+        <h2><a href="{% url 'entry-detail' favorite.entry.pk %}">{{ favorite.entry.title }}</a></h2>
+        <p style="color: #777; font-size: 14px; margin-bottom: 10px;">
+            By {{ favorite.entry.author }} | Added to favorites: {{ favorite.created_at|date:"M d, Y H:i" }}
+        </p>
+        <div style="margin-bottom: 15px;">
+            {{ favorite.entry.body|truncatewords:30 }}
+        </div>
+        <div style="margin-bottom: 10px;">
+            {% for tag in favorite.entry.tags.all %}
+                <a href="{% url 'entry-list' %}?tag={{ tag.value }}" class="tag">{{ tag.value }}</a>
+            {% endfor %}
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <a href="{% url 'entry-detail' favorite.entry.pk %}" class="btn btn-secondary">View Entry</a>
+            <a href="{% url 'toggle-favorite' favorite.entry.pk %}" class="btn btn-danger">Remove from Favorites</a>
+        </div>
+    </div>
+    {% endfor %}
+    
+{% else %}
+    <div class="entry-card">
+        <p>You haven't favorited any entries yet.</p>
+        <p><a href="{% url 'entry-list' %}" class="btn">Browse entries</a></p>
+    </div>
+{% endif %}
+{% endblock %}

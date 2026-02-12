@@ -4,13 +4,13 @@ services:
     environment:
       POSTGRES_DB: notesDB
       POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin
+      POSTGRES_PASSWORD: password
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_ready -U admin"]
+      test: ["CMD-SHELL", "pg_isready -U admin"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -26,10 +26,13 @@ services:
       - DB_HOST=db
       - DB_NAME=notesDB
       - DB_USER=admin
-      - DB_PASSWORD=admin
+      - DB_PASSWORD=password
+      - DEBUG=1
+      - PYTHONUNBUFFERED=1
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:

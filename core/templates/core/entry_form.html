@@ -1,0 +1,62 @@
+{% extends "core/base.html" %}
+
+{% block title %}{% if object %}Edit{% else %}Create{% endif %} Entry - LiberCode{% endblock %}
+
+{% block content %}
+<h1>{% if object %}Edit{% else %}Create{% endif %} Entry</h1>
+
+<div class="entry-card">
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label for="id_title">Title</label>
+            {{ form.title }}
+            {% if form.title.errors %}
+                <div style="color: #e74c3c; font-size: 14px;">
+                    {{ form.title.errors }}
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            <label for="id_body">Content</label>
+            {{ form.body }}
+            {% if form.body.errors %}
+                <div style="color: #e74c3c; font-size: 14px;">
+                    {{ form.body.errors }}
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            <label for="id_shared">
+                {{ form.shared.label }}
+                {{ form.shared }}
+            </label>
+            <small style="color: #777;">Check to make this entry public</small>
+            {% if form.shared.errors %}
+                <div style="color: #e74c3c; font-size: 14px;">
+                    {{ form.shared.errors }}
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            <label for="id_tags">Tags</label>
+            {{ form.tags }}
+            <small style="color: #777;">Hold Ctrl/Cmd to select multiple tags</small>
+            {% if form.tags.errors %}
+                <div style="color: #e74c3c; font-size: 14px;">
+                    {{ form.tags.errors }}
+                </div>
+            {% endif %}
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button type="submit" class="btn">Save</button>
+            <a href="{% if object %}{% url 'entry-detail' object.pk %}{% else %}{% url 'entry-list' %}{% endif %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
