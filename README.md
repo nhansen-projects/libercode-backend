@@ -40,8 +40,18 @@ docker-compose down
 
 ## Project Structure
 
-- `libercode/`: Contains the Django project and applications.
-  - `manage.py`: Django's command-line utility for administrative tasks.
-  - `libercode/`: Project configuration (settings, URLs, etc.).
-- `venv/`: Python virtual environment (should be ignored by git).
-- `.gitignore`: Specifies files for Git to ignore.
+- `manage.py`: Django's command-line utility for administrative tasks
+- `libercode/`: Django project configuration package
+  - `settings.py`: Project settings and configuration
+  - `urls.py`: URL routing configuration
+  - `wsgi.py` / `asgi.py`: WSGI/ASGI application entry points
+  - `tests/`: Project-level integration tests
+- `core/`: Core Django application
+  - `models.py`: Database models (Tag, Entry, Favorite)
+  - `views.py`: View logic
+  - `admin.py`: Django admin configuration
+  - `tests/`: App-specific unit tests
+- `requirements.txt`: Production dependencies
+- `requirements-dev.txt`: Development dependencies
+- `Dockerfile` / `docker-compose.yml`: Docker configuration
+- `.env.example`: Environment variables template

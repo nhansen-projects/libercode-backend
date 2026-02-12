@@ -4,8 +4,8 @@ import django
 
 # Add the project directory to the path
 import pathlib
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / 'libercode'))
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 # Set up Django settings
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'libercode.settings')

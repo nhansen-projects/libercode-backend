@@ -23,7 +23,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DB_HOST=localhost
+      - DB_HOST=db
       - DB_NAME=notesDB
       - DB_USER=admin
       - DB_PASSWORD=admin
