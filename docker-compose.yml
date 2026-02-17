@@ -10,13 +10,14 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_ready -U admin"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d notesDB"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   web:
     build: .
+    working_dir: /app/libercode
     command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
