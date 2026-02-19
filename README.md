@@ -77,7 +77,44 @@ This also indicates the virtual environment is not activated or dependencies are
 - `requirements.txt`: Python dependencies
 - `.venv/`: Virtual environment (not committed to git)
 
-## Running the Development Server
+## Running with Docker (Recommended)
+
+This project includes Docker configuration for easy setup and development.
+
+### Prerequisites
+- Docker Engine (v20.10+)
+- Docker Compose v2 (included with Docker)
+
+### Starting the Application
+
+```bash
+# Build and start containers
+docker compose up -d
+
+# View running containers
+docker compose ps
+
+# View logs
+docker compose logs web
+
+# Stop containers
+docker compose down
+```
+
+The application will be available at:
+- Web Interface: `http://localhost:8000`
+- API: `http://localhost:8000/api/entries/`
+- Admin: `http://localhost:8000/admin/`
+
+### Running Management Commands
+
+```bash
+# Run Django management commands in the container
+docker compose exec web python manage.py check
+docker compose exec web python manage.py createsuperuser
+```
+
+## Running the Development Server (Without Docker)
 
 ```bash
 # Activate virtual environment
