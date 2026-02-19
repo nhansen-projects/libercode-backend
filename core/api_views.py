@@ -127,6 +127,7 @@ class UserEntriesView(generics.ListAPIView):
     serializer_class = EntrySerializer
     pagination_class = PageNumberPagination
     authentication_classes = [CustomTokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
@@ -137,6 +138,7 @@ class UserFavoritesView(generics.ListAPIView):
     serializer_class = FavoriteSerializer
     pagination_class = PageNumberPagination
     authentication_classes = [CustomTokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user

@@ -22,11 +22,18 @@ class EntrySerializer(serializers.ModelSerializer):
         required=False,
         write_only=True
     )
+    favorite = serializers.SerializerMethodField()
     
     class Meta:
         model = Entry
-        fields = ['id', 'title', 'body', 'shared', 'author', 'tags', 'tag_ids', 'created_at']
-        read_only_fields = ['id', 'author', 'created_at']
+        fields = ['id', 'title', 'body', 'shared', 'author', 'tags', 'tag_ids', 'favorite', 'created_at']
+        read_only_fields = ['id', 'author', 'favorite', 'created_at']
+    
+    def get_favorite(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return Favorite.objects.filter(user=request.user, entry=obj).exists()
+        return False
     
     def create(self, validated_data):
         tags = validated_data.pop('tags', [])
