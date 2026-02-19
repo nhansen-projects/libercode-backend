@@ -39,6 +39,7 @@ urlpatterns = [
     
     # Authentication URLs
     path('accounts/register/', views.RegisterView.as_view(), name='register'),
+    path('accounts/profile/', views.ProfileView.as_view(), name='profile'),
     
     # Web interface URLs
     path('entries/', views.EntryListView.as_view(), name='entry-list'),

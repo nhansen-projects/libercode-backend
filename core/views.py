@@ -162,3 +162,22 @@ class RegisterView(CreateView):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Register'
         return context
+
+
+class ProfileView(LoginRequiredMixin, TemplateView):
+    """
+    User profile view - redirects to user's entries
+    """
+    template_name = 'core/profile.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        
+        # Get user's entries
+        context['user_entries'] = Entry.objects.filter(author=user).order_by('-created_at')[:10]
+        
+        # Get user's favorites
+        context['user_favorites'] = Favorite.objects.filter(user=user).select_related('entry').order_by('-created_at')[:10]
+        
+        return context
