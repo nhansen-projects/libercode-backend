@@ -70,6 +70,7 @@ class Entry(models.Model):
     )
     tags = models.ManyToManyField(Tag, related_name="entries", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    last_edited = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at"]

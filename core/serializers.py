@@ -26,8 +26,8 @@ class EntrySerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Entry
-        fields = ['id', 'title', 'body', 'shared', 'author', 'tags', 'tag_ids', 'favorite', 'created_at']
-        read_only_fields = ['id', 'author', 'favorite', 'created_at']
+        fields = ['id', 'title', 'body', 'shared', 'author', 'tags', 'tag_ids', 'favorite', 'created_at', 'last_edited']
+        read_only_fields = ['id', 'author', 'favorite', 'created_at', 'last_edited']
     
     def get_favorite(self, obj):
         request = self.context.get('request')
