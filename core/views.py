@@ -181,3 +181,16 @@ class ProfileView(LoginRequiredMixin, TemplateView):
         context['user_favorites'] = Favorite.objects.filter(user=user).select_related('entry').order_by('-created_at')[:10]
         
         return context
+
+
+class CustomLogoutView(TemplateView):
+    """
+    Custom logout view that handles both GET and POST requests
+    """
+    template_name = 'registration/logout.html'
+    
+    def get(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            from django.contrib.auth import logout
+            logout(request)
+        return super().get(request, *args, **kwargs)

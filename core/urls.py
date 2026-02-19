@@ -1,5 +1,6 @@
 from django.urls import path, include
 from . import views
+from django.contrib.auth import views as auth_views
 
 # Try to import API views, but don't fail if REST framework is not installed
 try:
@@ -38,8 +39,16 @@ urlpatterns = [
     path('', views.EntryListView.as_view(), name='home'),
     
     # Authentication URLs
+    path('accounts/login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
+    path('accounts/logout/', views.CustomLogoutView.as_view(), name='logout'),
     path('accounts/register/', views.RegisterView.as_view(), name='register'),
     path('accounts/profile/', views.ProfileView.as_view(), name='profile'),
+    
+    # Password reset URLs
+    path('accounts/password_reset/', auth_views.PasswordResetView.as_view(template_name='registration/password_reset_form.html'), name='password_reset'),
+    path('accounts/password_reset/done/', auth_views.PasswordResetDoneView.as_view(template_name='registration/password_reset_done.html'), name='password_reset_done'),
+    path('accounts/reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(template_name='registration/password_reset_confirm.html'), name='password_reset_confirm'),
+    path('accounts/reset/done/', auth_views.PasswordResetCompleteView.as_view(template_name='registration/password_reset_complete.html'), name='password_reset_complete'),
     
     # Web interface URLs
     path('entries/', views.EntryListView.as_view(), name='entry-list'),
