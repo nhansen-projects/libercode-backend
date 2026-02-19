@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: notesDB
       POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin
+      POSTGRES_PASSWORD: password
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     ports:
@@ -14,6 +14,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   web:
     build: .
@@ -27,10 +28,13 @@ services:
       - DB_HOST=db
       - DB_NAME=notesDB
       - DB_USER=admin
-      - DB_PASSWORD=admin
+      - DB_PASSWORD=password
+      - DEBUG=1
+      - PYTHONUNBUFFERED=1
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:

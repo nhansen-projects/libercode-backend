@@ -1,0 +1,70 @@
+{% extends "core/base.html" %}
+
+{% block title %}Entries - LiberCode{% endblock %}
+
+{% block content %}
+<h1>Entries</h1>
+
+<div style="margin-bottom: 20px; display: flex; gap: 10px;">
+    <form method="get" action="" style="flex-grow: 1; display: flex; gap: 10px;">
+        <input type="text" name="q" placeholder="Search entries..." value="{{ request.GET.q }}" style="flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+        <button type="submit" class="btn">Search</button>
+    </form>
+    {% if user.is_authenticated %}
+    <a href="{% url 'entry-create' %}" class="btn">New Entry</a>
+    {% endif %}
+</div>
+
+{% if entries %}
+    {% for entry in entries %}
+    <div class="entry-card">
+        <h2><a href="{% url 'entry-detail' entry.pk %}">{{ entry.title }}</a></h2>
+        <p style="color: #777; font-size: 14px; margin-bottom: 10px;">
+            By {{ entry.author }} | {{ entry.created_at|date:"M d, Y H:i" }}
+            {% if not entry.shared %}<span style="color: #e74c3c; font-weight: bold;">(Private)</span>{% endif %}
+        </p>
+        <div style="margin-bottom: 15px;">
+            {{ entry.body|truncatewords:50 }}
+        </div>
+        <div style="margin-bottom: 10px;">
+            {% for tag in entry.tags.all %}
+                <a href="{% url 'entry-list' %}?tag={{ tag.value }}" class="tag">{{ tag.value }}</a>
+            {% endfor %}
+        </div>
+        <div>
+            <a href="{% url 'entry-detail' entry.pk %}" class="btn btn-secondary">Read More</a>
+            {% if user.is_authenticated and user == entry.author %}
+                <a href="{% url 'entry-update' entry.pk %}" class="btn">Edit</a>
+                <a href="{% url 'entry-delete' entry.pk %}" class="btn btn-danger">Delete</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    
+    {% if is_paginated %}
+    <div class="pagination">
+        {% if page_obj.has_previous %}
+            <a href="?page=1{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tag %}&tag={{ request.GET.tag }}{% endif %}">&laquo; first</a>
+            <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tag %}&tag={{ request.GET.tag }}{% endif %}">previous</a>
+        {% endif %}
+        
+        <span class="current">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </span>
+        
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tag %}&tag={{ request.GET.tag }}{% endif %}">next</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tag %}&tag={{ request.GET.tag }}{% endif %}">last &raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+{% else %}
+    <div class="entry-card">
+        <p>No entries found.</p>
+        {% if user.is_authenticated %}
+        <p><a href="{% url 'entry-create' %}" class="btn">Create your first entry</a></p>
+        {% endif %}
+    </div>
+{% endif %}
+{% endblock %}

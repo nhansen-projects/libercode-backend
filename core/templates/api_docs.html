@@ -1,0 +1,343 @@
+{% extends "core/base.html" %}
+
+{% block title %}API Documentation{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 style="margin-bottom: 30px;">LiberCode API Documentation</h1>
+    
+    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h2>Base URL</h2>
+        <p><code>http://your-api-url/api/</code></p>
+        
+        <h2>Authentication</h2>
+        <p>All API endpoints (except authentication endpoints) require a token in the Authorization header:</p>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+Authorization: Token YOUR_TOKEN_HERE
+        </pre>
+    </div>
+    
+    <!-- Authentication Endpoints -->
+    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h2>Authentication Endpoints</h2>
+        
+        <h3>POST /api/register/</h3>
+        <p><strong>Register a new user</strong></p>
+        <p><strong>Permissions:</strong> Public</p>
+        
+        <h4>Request Body:</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "username": "your_username",
+    "email": "your@email.com", 
+    "password": "your_password"
+}
+        </pre>
+        
+        <h4>Response:</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "user": {
+        "id": 1,
+        "username": "your_username",
+        "email": "your@email.com"
+    },
+    "token": "your_auth_token",
+    "expires_at": "2023-12-31T23:59:59Z"
+}
+        </pre>
+    </div>
+    
+    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3>POST /api/login/</h3>
+        <p><strong>Login and get authentication token</strong></p>
+        <p><strong>Permissions:</strong> Public</p>
+        
+        <h4>Request Body:</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "username": "your_username",
+    "password": "your_password"
+}
+        </pre>
+        
+        <h4>Response:</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "user": {
+        "id": 1,
+        "username": "your_username",
+        "email": "your@email.com"
+    },
+    "token": "your_auth_token",
+    "expires_at": "2023-12-31T23:59:59Z"
+}
+        </pre>
+    </div>
+    
+    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3>POST /api/logout/</h3>
+        <p><strong>Logout and revoke token</strong></p>
+        <p><strong>Permissions:</strong> Authenticated</p>
+        
+        <h4>Headers:</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+Authorization: Token YOUR_TOKEN_HERE
+        </pre>
+        
+        <h4>Response:</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "message": "Successfully logged out"
+}
+        </pre>
+    </div>
+    
+    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3>POST /api/token/refresh/</h3>
+        <p><strong>Refresh authentication token</strong></p>
+        <p><strong>Permissions:</strong> Public</p>
+        
+        <h4>Request Body:</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "token": "your_current_token"
+}
+        </pre>
+        
+        <h4>Response:</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "token": "your_refreshed_token",
+    "expires_at": "2023-12-31T23:59:59Z"
+}
+        </pre>
+    </div>
+    
+    <!-- Entry Endpoints -->
+    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h2>Entry Endpoints</h2>
+        
+        <h3>GET /api/entries/</h3>
+        <p><strong>Get all entries (public entries only for non-authenticated users)</strong></p>
+        <p><strong>Permissions:</strong> Public (read-only), Authenticated (full access)</p>
+        
+        <h4>Query Parameters:</h4>
+        <ul>
+            <li><code>q</code> - Search query</li>
+            <li><code>tag</code> - Filter by tag</li>
+            <li><code>page</code> - Page number</li>
+            <li><code>page_size</code> - Items per page</li>
+        </ul>
+        
+        <h4>Response:</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "count": 123,
+    "next": "http://api-url/api/entries/?page=2",
+    "previous": null,
+    "results": [
+        {
+            "id": 1,
+            "title": "Entry Title",
+            "body": "Entry content...",
+            "shared": true,
+            "author": "username",
+            "tags": [{"id": 1, "value": "tag1"}],
+            "created_at": "2023-12-31T23:59:59Z"
+        }
+    ]
+}
+        </pre>
+    </div>
+    
+    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3>POST /api/entries/</h3>
+        <p><strong>Create a new entry</strong></p>
+        <p><strong>Permissions:</strong> Authenticated</p>
+        
+        <h4>Request Body:</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "title": "New Entry",
+    "body": "Entry content goes here...",
+    "shared": false,
+    "tag_ids": [1, 2]  // Optional: list of tag IDs
+}
+        </pre>
+        
+        <h4>Response:</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "id": 123,
+    "title": "New Entry",
+    "body": "Entry content goes here...",
+    "shared": false,
+    "author": "your_username",
+    "tags": [{"id": 1, "value": "tag1"}],
+    "created_at": "2023-12-31T23:59:59Z"
+}
+        </pre>
+    </div>
+    
+    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3>GET /api/entries/{id}/</h3>
+        <p><strong>Get entry details</strong></p>
+        <p><strong>Permissions:</strong> Public (if shared), Authenticated (if private and owned by user)</p>
+        
+        <h4>Response:</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "id": 123,
+    "title": "Entry Title",
+    "body": "Entry content...",
+    "shared": false,
+    "author": "username",
+    "tags": [{"id": 1, "value": "tag1"}],
+    "created_at": "2023-12-31T23:59:59Z"
+}
+        </pre>
+    </div>
+    
+    <!-- User-Specific Endpoints -->
+    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h2>User-Specific Endpoints</h2>
+        
+        <h3>GET /api/me/entries/</h3>
+        <p><strong>Get current user's entries</strong></p>
+        <p><strong>Permissions:</strong> Authenticated</p>
+        
+        <h4>Response:</h4>
+        <p>Same format as GET /api/entries/ but only shows current user's entries</p>
+    </div>
+    
+    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h3>GET /api/me/favorites/</h3>
+        <p><strong>Get current user's favorite entries</strong></p>
+        <p><strong>Permissions:</strong> Authenticated</p>
+        
+        <h4>Response:</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "count": 5,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 1,
+            "user": "username",
+            "entry": {
+                "id": 123,
+                "title": "Favorited Entry",
+                "body": "Content...",
+                "shared": true,
+                "author": "author_name",
+                "tags": [],
+                "created_at": "2023-12-31T23:59:59Z"
+            },
+            "created_at": "2023-12-31T23:59:59Z"
+        }
+    ]
+}
+        </pre>
+    </div>
+    
+    <!-- Tag Endpoints -->
+    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h2>Tag Endpoints</h2>
+        
+        <h3>GET /api/tags/</h3>
+        <p><strong>Get all tags</strong></p>
+        <p><strong>Permissions:</strong> Public</p>
+        
+        <h4>Response:</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "count": 10,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 1,
+            "value": "django",
+            "created_at": "2023-12-31T23:59:59Z"
+        }
+    ]
+}
+        </pre>
+    </div>
+    
+    <!-- Error Responses -->
+    <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <h2>Error Responses</h2>
+        
+        <h3>Common Error Formats</h3>
+        
+        <h4>400 Bad Request</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "error": true,
+    "message": "Both username and password are required",
+    "status_code": 400
+}
+        </pre>
+        
+        <h4>401 Unauthorized</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "error": true,
+    "message": "Invalid username or password",
+    "status_code": 401
+}
+        </pre>
+        
+        <h4>403 Forbidden</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "error": true,
+    "message": "You do not have permission to perform this action.",
+    "status_code": 403
+}
+        </pre>
+        
+        <h4>404 Not Found</h4>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+{
+    "error": true,
+    "message": "Not found.",
+    "status_code": 404
+}
+        </pre>
+    </div>
+</div>
+{% endblock %}
+
+<style>
+    /* Add some styling for code blocks */
+    pre {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+    
+    code {
+        background-color: #f5f5f5;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: monospace;
+    }
+    
+    h2 {
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+        margin-top: 30px;
+    }
+    
+    h3 {
+        color: #2c3e50;
+        margin-top: 20px;
+    }
+</style>

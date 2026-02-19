@@ -1,0 +1,44 @@
+{% extends "core/base.html" %}
+
+{% block title %}{{ entry.title }} - LiberCode{% endblock %}
+
+{% block content %}
+<div class="entry-card">
+    <h1>{{ entry.title }}</h1>
+    
+    <div style="margin-bottom: 20px; color: #777; font-size: 14px;">
+        By {{ entry.author }} | {{ entry.created_at|date:"M d, Y H:i" }}
+        {% if not entry.shared %}<span style="color: #e74c3c; font-weight: bold;">(Private)</span>{% endif %}
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+        {{ entry.body|linebreaks }}
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+        <strong>Tags:</strong>
+        {% for tag in entry.tags.all %}
+            <a href="{% url 'entry-list' %}?tag={{ tag.value }}" class="tag">{{ tag.value }}</a>
+        {% endfor %}
+    </div>
+    
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        {% if user.is_authenticated %}
+            {% if is_favorited %}
+                <a href="{% url 'toggle-favorite' entry.pk %}" class="btn btn-danger">❤️ Remove from Favorites</a>
+            {% else %}
+                <a href="{% url 'toggle-favorite' entry.pk %}" class="btn">❤️ Add to Favorites</a>
+            {% endif %}
+        {% endif %}
+        
+        {% if user.is_authenticated and user == entry.author %}
+            <a href="{% url 'entry-update' entry.pk %}" class="btn">Edit</a>
+            <a href="{% url 'entry-delete' entry.pk %}" class="btn btn-danger">Delete</a>
+        {% endif %}
+    </div>
+    
+    <div>
+        <a href="{% url 'entry-list' %}" class="btn btn-secondary">← Back to all entries</a>
+    </div>
+</div>
+{% endblock %}

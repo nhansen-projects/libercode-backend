@@ -1,0 +1,85 @@
+{% extends "core/base.html" %}
+
+{% block title %}Your Profile - LiberCode{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Your Profile</h1>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Your Entries</h3>
+                </div>
+                <div class="card-body">
+                    {% if user_entries %}
+                        <ul class="list-group list-group-flush">
+                            {% for entry in user_entries %}
+                                <li class="list-group-item">
+                                    <a href="{% url 'entry-detail' entry.pk %}">{{ entry.title }}</a>
+                                    <span class="float-end text-muted">{{ entry.created_at|date:"M d, Y" }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                        <div class="mt-3">
+                            <a href="{% url 'entry-list' %}?author={{ request.user.username }}" class="btn btn-outline-primary">
+                                View All Your Entries
+                            </a>
+                        </div>
+                    {% else %}
+                        <p>You haven't created any entries yet.</p>
+                        <a href="{% url 'entry-create' %}" class="btn btn-primary">Create Your First Entry</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Your Favorites</h3>
+                </div>
+                <div class="card-body">
+                    {% if user_favorites %}
+                        <ul class="list-group list-group-flush">
+                            {% for favorite in user_favorites %}
+                                <li class="list-group-item">
+                                    <a href="{% url 'entry-detail' favorite.entry.pk %}">{{ favorite.entry.title }}</a>
+                                    <span class="float-end text-muted">{{ favorite.created_at|date:"M d, Y" }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                        <div class="mt-3">
+                            <a href="{% url 'favorites' %}" class="btn btn-outline-primary">
+                                View All Favorites
+                            </a>
+                        </div>
+                    {% else %}
+                        <p>You haven't favorited any entries yet.</p>
+                        <a href="{% url 'entry-list' %}" class="btn btn-primary">Browse Entries</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mt-4">
+        <div class="card-header">
+            <h3>Account Information</h3>
+        </div>
+        <div class="card-body">
+            <dl class="row">
+                <dt class="col-sm-3">Username:</dt>
+                <dd class="col-sm-9">{{ user.username }}</dd>
+                
+                <dt class="col-sm-3">Email:</dt>
+                <dd class="col-sm-9">{{ user.email }}</dd>
+                
+                <dt class="col-sm-3">Member since:</dt>
+                <dd class="col-sm-9">{{ user.date_joined|date:"M d, Y" }}</dd>
+            </dl>
+        </div>
+    </div>
+</div>
+{% endblock %}

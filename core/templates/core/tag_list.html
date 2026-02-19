@@ -1,0 +1,57 @@
+{% extends "core/base.html" %}
+
+{% block title %}Tags - LiberCode{% endblock %}
+
+{% block content %}
+<h1>Tags</h1>
+
+<div style="margin-bottom: 20px;">
+    {% if user.is_authenticated %}
+    <a href="{% url 'tag-create' %}" class="btn">Create New Tag</a>
+    {% endif %}
+</div>
+
+{% if tags %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px;">
+        {% for tag in tags %}
+        <div class="entry-card" style="padding: 15px;">
+            <h3 style="margin-top: 0;"><a href="{% url 'tag-detail' tag.pk %}">{{ tag.value }}</a></h3>
+            <p style="color: #777; font-size: 14px; margin-bottom: 10px;">
+                Created: {{ tag.created_at|date:"M d, Y" }}
+            </p>
+            <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                {% if user.is_authenticated %}
+                    <a href="{% url 'tag-update' tag.pk %}" class="btn" style="padding: 6px 12px; font-size: 12px;">Edit</a>
+                    <a href="{% url 'tag-delete' tag.pk %}" class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;">Delete</a>
+                {% endif %}
+                <a href="{% url 'entry-list' %}?tag={{ tag.value }}" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">View Entries</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% if is_paginated %}
+    <div class="pagination">
+        {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+        {% endif %}
+        
+        <span class="current">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </span>
+        
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">next</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+{% else %}
+    <div class="entry-card">
+        <p>No tags found.</p>
+        {% if user.is_authenticated %}
+        <p><a href="{% url 'tag-create' %}" class="btn">Create your first tag</a></p>
+        {% endif %}
+    </div>
+{% endif %}
+{% endblock %}
