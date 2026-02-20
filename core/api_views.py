@@ -73,6 +73,7 @@ class EntryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = EntrySerializer
     queryset = Entry.objects.all()
     authentication_classes = [CustomTokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -84,6 +85,38 @@ class EntryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
             )
 
         return queryset
+
+    def perform_update(self, serializer):
+        entry = self.get_object()
+        # Only allow the author to update their own entry
+        if entry.author != self.request.user and not self.request.user.is_staff:
+            raise exceptions.PermissionDenied("You can only edit your own entries.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        # Only allow the author to delete their own entry
+        if instance.author != self.request.user and not self.request.user.is_staff:
+            raise exceptions.PermissionDenied("You can only delete your own entries.")
+        instance.delete()
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            self.perform_destroy(instance)
+            return Response(
+                {"result": "Success", "message": "Entry deleted successfully."},
+                status=status.HTTP_200_OK,
+            )
+        except exceptions.APIException as exc:
+            return Response(
+                {"result": "Fail", "message": str(exc.detail)},
+                status=exc.status_code,
+            )
+        except Exception as exc:
+            return Response(
+                {"result": "Fail", "message": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class TagListCreateView(generics.ListCreateAPIView):
