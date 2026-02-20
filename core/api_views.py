@@ -221,6 +221,9 @@ class LoginView(APIView):
         if 'encrypted_credentials' in request.data:
             # New secure format: encrypted credentials
             return self._handle_encrypted_login(request)
+        elif 'encryption_key' in request.data:
+            # Frontend format: encrypted username/password with encryption_key
+            return self._handle_frontend_encrypted_login(request)
         else:
             # Legacy format: plain credentials
             return self._handle_legacy_login(request)
@@ -271,11 +274,64 @@ class LoginView(APIView):
             return self._generate_jwt_response(user)
             
         except Exception as e:
+            import traceback
+            print(f"Frontend login error: {e}")
+            traceback.print_exc()
             return Response(
                 {'error': f'Decryption failed: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
     
+    def _handle_frontend_encrypted_login(self, request):
+        """Handle login with frontend's encrypted format"""
+        encrypted_username = request.data.get('username')
+        encrypted_password = request.data.get('password')
+        encryption_key = request.data.get('encryption_key')
+        
+        if not encrypted_username or not encrypted_password or not encryption_key:
+            return Response(
+                {'error': 'Username, password, and encryption_key are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Decode the base64 encryption key (try both standard and URL-safe)
+            import base64
+            try:
+                encryption_key_bytes = base64.urlsafe_b64decode(encryption_key)
+            except:
+                encryption_key_bytes = base64.b64decode(encryption_key)
+            encryption_key_base64 = base64.b64encode(encryption_key_bytes).decode('utf-8')
+            
+            # Decrypt username and password using AES
+            # The frontend encrypts data as JSON: {"iv": "...", "data": "..."}
+            # We need to manually decrypt this format since the backend's decrypt_with_aes
+            # expects a different format (iv + ciphertext concatenated)
+            username = self._decrypt_frontend_format(encrypted_username, encryption_key_base64)
+            password = self._decrypt_frontend_format(encrypted_password, encryption_key_base64)
+            
+            if not username or not password:
+                return Response(
+                    {'error': 'Invalid decrypted credentials format'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Authenticate user
+            user = self._authenticate_user(username, password)
+            if user is None:
+                return Response(
+                    {'error': 'Invalid username or password'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            return self._generate_jwt_response(user)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Decryption failed: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     def _handle_legacy_login(self, request):
         """Handle login with plain credentials"""
         username = request.data.get('username')
@@ -316,6 +372,36 @@ class LoginView(APIView):
         except User.DoesNotExist:
             return None
     
+    def _decrypt_frontend_format(self, encrypted_json, key_base64):
+        """Decrypt data encrypted in frontend's JSON format: {"iv": "...", "data": "..."}"""
+        import base64
+        import json
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+        from cryptography.hazmat.backends import default_backend
+        
+        # Parse the JSON
+        data = json.loads(encrypted_json)
+        iv = base64.urlsafe_b64decode(data['iv'])
+        encrypted_data = base64.urlsafe_b64decode(data['data'])
+        
+        # Decode key from base64
+        key_bytes = base64.b64decode(key_base64.encode('utf-8'))
+        
+        # Decrypt
+        cipher = Cipher(
+            algorithms.AES(key_bytes),
+            modes.CBC(iv),
+            backend=default_backend()
+        )
+        decryptor = cipher.decryptor()
+        decrypted_padded = decryptor.update(encrypted_data) + decryptor.finalize()
+        
+        # Remove padding
+        pad_length = decrypted_padded[-1]
+        decrypted = decrypted_padded[:-pad_length]
+        
+        return decrypted.decode('utf-8')
+
     def _generate_jwt_response(self, user):
         """Generate JWT tokens for authentication response"""
         refresh = RefreshToken.for_user(user)
