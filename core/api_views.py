@@ -8,9 +8,13 @@ from django.db import models
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
-from .models import Entry, Tag, Favorite, AuthToken
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
+from .models import Entry, Tag, Favorite, AuthToken, User, EncryptionKey
 from .serializers import EntrySerializer, TagSerializer, FavoriteSerializer, UserSerializer
+from .utils import SecurityUtils
 import datetime
+import json
 
 
 class CustomTokenAuthentication:
@@ -182,12 +186,54 @@ class UserFavoritesView(generics.ListAPIView):
 class UserCreateView(generics.CreateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
+    queryset = User.objects.all()
     queryset = get_user_model().objects.all()
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        user_data = serializer.validated_data
+        
+        # Handle different registration formats
+        password_data = request.data.get('password')
+        password_hash = request.data.get('password_hash')
+        salt = request.data.get('salt')
+        
+        if password_hash and salt:
+            # New secure format: password_hash + salt from Flutter client
+            user_data['password'] = password_hash
+            user_data['salt'] = salt
+        elif password_data:
+            # Legacy format: plain password (hash server-side)
+            # Use our custom password hashing with salt
+            user = User()
+            user.username = user_data['username']
+            user.email = user_data.get('email', '')
+            user.set_password(password_data)
+            user.save()
+            
+            return self._generate_auth_response(user)
+        else:
+            return Response(
+                {'error': 'Either password or password_hash+salt required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create user with hashed password and salt
+        user = User.objects.create_user(
+            username=user_data['username'],
+            email=user_data.get('email', ''),
+            password=user_data['password'],
+            salt=user_data.get('salt')
+        )
+        
+        return self._generate_auth_response(user)
+    
+    def _generate_auth_response(self, user):
+        """Generate JWT tokens for authentication response"""
+        refresh = RefreshToken.for_user(user)
+        
         # Hash password
         user_data = serializer.validated_data
         user_data['password'] = make_password(user_data['password'])
@@ -203,6 +249,12 @@ class UserCreateView(generics.CreateAPIView):
                 'username': user.username,
                 'email': user.email
             },
+            'tokens': {
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+                'access_expires': refresh.access_token.payload['exp'],
+                'refresh_expires': refresh.payload['exp'],
+            }
             'token': token.token,
             'expires_at': token.expires_at.isoformat(),
         }, status=status.HTTP_201_CREATED)
@@ -212,6 +264,123 @@ class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
+        # Handle different login formats
+        if 'encrypted_credentials' in request.data:
+            # New secure format: encrypted credentials
+            return self._handle_encrypted_login(request)
+        elif 'encryption_key' in request.data:
+            # Frontend format: encrypted username/password with encryption_key
+            return self._handle_frontend_encrypted_login(request)
+        else:
+            # Legacy format: plain credentials
+            return self._handle_legacy_login(request)
+    
+    def _handle_encrypted_login(self, request):
+        """Handle login with encrypted credentials"""
+        encrypted_credentials = request.data.get('encrypted_credentials')
+        decryption_key = request.data.get('decryption_key')
+        key_type = request.data.get('key_type', 'fernet')
+        
+        if not encrypted_credentials or not decryption_key:
+            return Response(
+                {'error': 'Both encrypted_credentials and decryption_key are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get the appropriate encryption key
+            if key_type == 'fernet':
+                decrypted_data = SecurityUtils.decrypt_with_fernet(encrypted_credentials, decryption_key)
+            elif key_type == 'aes':
+                decrypted_data = SecurityUtils.decrypt_with_aes(encrypted_credentials, decryption_key)
+            else:
+                return Response(
+                    {'error': 'Unsupported key_type'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Parse decrypted credentials
+            credentials = json.loads(decrypted_data)
+            username = credentials.get('username')
+            password = credentials.get('password')
+            
+            if not username or not password:
+                return Response(
+                    {'error': 'Invalid decrypted credentials format'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Authenticate user
+            user = self._authenticate_user(username, password)
+            if user is None:
+                return Response(
+                    {'error': 'Invalid username or password'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            return self._generate_jwt_response(user)
+            
+        except Exception as e:
+            import traceback
+            print(f"Frontend login error: {e}")
+            traceback.print_exc()
+            return Response(
+                {'error': f'Decryption failed: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    def _handle_frontend_encrypted_login(self, request):
+        """Handle login with frontend's encrypted format"""
+        encrypted_username = request.data.get('username')
+        encrypted_password = request.data.get('password')
+        encryption_key = request.data.get('encryption_key')
+        
+        if not encrypted_username or not encrypted_password or not encryption_key:
+            return Response(
+                {'error': 'Username, password, and encryption_key are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Decode the base64 encryption key (try both standard and URL-safe)
+            import base64
+            try:
+                encryption_key_bytes = base64.urlsafe_b64decode(encryption_key)
+            except:
+                encryption_key_bytes = base64.b64decode(encryption_key)
+            encryption_key_base64 = base64.b64encode(encryption_key_bytes).decode('utf-8')
+            
+            # Decrypt username and password using AES
+            # The frontend encrypts data as JSON: {"iv": "...", "data": "..."}
+            # We need to manually decrypt this format since the backend's decrypt_with_aes
+            # expects a different format (iv + ciphertext concatenated)
+            username = self._decrypt_frontend_format(encrypted_username, encryption_key_base64)
+            password = self._decrypt_frontend_format(encrypted_password, encryption_key_base64)
+            
+            if not username or not password:
+                return Response(
+                    {'error': 'Invalid decrypted credentials format'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Authenticate user
+            user = self._authenticate_user(username, password)
+            if user is None:
+                return Response(
+                    {'error': 'Invalid username or password'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            return self._generate_jwt_response(user)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Decryption failed: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def _handle_legacy_login(self, request):
+        """Handle login with plain credentials"""
         username = request.data.get('username')
         password = request.data.get('password')
 
@@ -221,7 +390,7 @@ class LoginView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        user = authenticate(username=username, password=password)
+        user = self._authenticate_user(username, password)
 
         if user is None:
             return Response(
@@ -229,24 +398,81 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        # Generate/refresh token
-        token, created = AuthToken.objects.get_or_create(user=user)
-        if not created:
-            token.extend()
+        return self._generate_jwt_response(user)
+    
+    def _authenticate_user(self, username, password):
+        """Authenticate user with both legacy and new password formats"""
+        try:
+            user = User.objects.get(username=username)
+            
+            # Check if user has salt (new format)
+            if user.salt:
+                # Use our custom password verification
+                if SecurityUtils.verify_password(password, user.password, user.salt):
+                    return user
+            else:
+                # Fallback to Django's default authentication for legacy users
+                if user.check_password(password):
+                    return user
+            
+            return None
+        except User.DoesNotExist:
+            return None
+    
+    def _decrypt_frontend_format(self, encrypted_json, key_base64):
+        """Decrypt data encrypted in frontend's JSON format: {"iv": "...", "data": "..."}"""
+        import base64
+        import json
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+        from cryptography.hazmat.backends import default_backend
+        
+        # Parse the JSON
+        data = json.loads(encrypted_json)
+        iv = base64.urlsafe_b64decode(data['iv'])
+        encrypted_data = base64.urlsafe_b64decode(data['data'])
+        
+        # Decode key from base64
+        key_bytes = base64.b64decode(key_base64.encode('utf-8'))
+        
+        # Decrypt
+        cipher = Cipher(
+            algorithms.AES(key_bytes),
+            modes.CBC(iv),
+            backend=default_backend()
+        )
+        decryptor = cipher.decryptor()
+        decrypted_padded = decryptor.update(encrypted_data) + decryptor.finalize()
+        
+        # Remove padding
+        pad_length = decrypted_padded[-1]
+        decrypted = decrypted_padded[:-pad_length]
+        
+        return decrypted.decode('utf-8')
 
+    def _generate_jwt_response(self, user):
+        """Generate JWT tokens for authentication response"""
+        refresh = RefreshToken.for_user(user)
+        
         return Response({
             'user': {
                 'id': user.id,
                 'username': user.username,
                 'email': user.email
             },
-            'token': token.token,
-            'expires_at': token.expires_at.isoformat(),
+            'tokens': {
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+                'access_expires': refresh.access_token.payload['exp'],
+                'refresh_expires': refresh.payload['exp'],
+            }
         })
 
 
 class LogoutView(APIView):
     def post(self, request):
+        # For JWT, logout is typically handled client-side by removing tokens
+        # But we can implement token blacklisting if needed
+        return Response({'message': 'Logout successful - remove tokens client-side'}, status=status.HTTP_200_OK)
         auth_header = request.headers.get('Authorization')
         if auth_header and auth_header.startswith('Token '):
             token_key = auth_header.split(' ')[1]
@@ -264,33 +490,26 @@ class TokenRefreshView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        token_key = request.data.get('token')
+        refresh_token = request.data.get('refresh')
 
-        if not token_key:
+        if not refresh_token:
             return Response(
-                {'error': 'Token is required'},
+                {'error': 'Refresh token is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-            token = AuthToken.objects.get(token=token_key)
-
-            if not token.is_valid():
-                token.delete()
-                return Response(
-                    {'error': 'Token has expired'},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-            token.extend()
-
+            refresh = RefreshToken(refresh_token)
+            access_token = str(refresh.access_token)
+            
             return Response({
-                'token': token.token,
-                'expires_at': token.expires_at.isoformat(),
+                'access': access_token,
+                'access_expires': refresh.access_token.payload['exp'],
             })
 
-        except AuthToken.DoesNotExist:
+        except TokenError as e:
             return Response(
-                {'error': 'Invalid token'},
+                {'error': f'Invalid refresh token: {str(e)}'},
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
