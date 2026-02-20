@@ -5,12 +5,15 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-t&gz-8w!o!3%*n3hbx%uwv0c449n-+)+6#9m++h-e5b2jf8j&e')
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY must be set in environment variables for security reasons")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',') if os.environ.get('ALLOWED_HOSTS') else ['*']
+# Security: Restrict allowed hosts to prevent host header attacks
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -140,12 +143,12 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),  # Shorter lifetime for security
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',
-    'SIGNING_KEY': 'django-insecure-t&gz-8w!o!3%*n3hbx%uwv0c449n-+)+6#9m++h-e5b2jf8j&e',
+    'SIGNING_KEY': os.environ.get('JWT_SIGNING_KEY'),
     'VERIFYING_KEY': None,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'USER_ID_FIELD': 'id',
@@ -153,16 +156,45 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 }
 
-# CORS settings
+# Validate JWT signing key
+if not SIMPLE_JWT['SIGNING_KEY']:
+    raise ValueError("JWT_SIGNING_KEY must be set in environment variables for security reasons")
+
+# CORS settings - restrictive by default for security
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8080",  # Flutter dev server
     "http://127.0.0.1:8080",
     "http://localhost:3000",  # Common React dev server
     "http://127.0.0.1:3000",
+    "http://localhost:35237", # Current Flutter dev server
+    "http://127.0.0.1:35237",
+    "http://localhost:8000",  # Local backend testing
+    "http://127.0.0.1:8000",
+]
+
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]
+
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = True  # For development only, disable in production
+CORS_ALLOW_ALL_ORIGINS = False  # Disabled for security - use explicit allowed origins only
 
 # Custom JWT-like token settings (simplified for this implementation)
 # In a production environment, you would use djangorestframework-simplejwt

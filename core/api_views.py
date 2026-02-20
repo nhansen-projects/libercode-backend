@@ -5,6 +5,7 @@ from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from django.db import models
+from django.db.models import Q
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
@@ -15,10 +16,31 @@ from .serializers import EntrySerializer, TagSerializer, FavoriteSerializer, Use
 from .utils import SecurityUtils
 import datetime
 import json
+import logging
+from django.core.cache import cache
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 
 class CustomTokenAuthentication:
+    """
+    Custom token authentication using AuthToken model.
+    
+    This authentication method uses token-based authentication where tokens
+    are stored in the database and have expiration dates.
+    """
+    
     def authenticate(self, request):
+        """
+        Authenticate the request using token-based authentication.
+        
+        Args:
+            request: The HTTP request object
+            
+        Returns:
+            tuple: (user, token) if authentication succeeds, None otherwise
+        """
         auth_header = request.headers.get('Authorization')
 
         if not auth_header or not auth_header.startswith('Token '):
@@ -41,10 +63,23 @@ class CustomTokenAuthentication:
             return None
 
     def authenticate_header(self, request):
+        """Return the authentication header name."""
         return 'Token'
 
 
 class EntryListCreateView(generics.ListCreateAPIView):
+    """
+    API endpoint for listing and creating entries.
+    
+    Supports:
+    - GET: List entries with filtering, searching, and ordering
+    - POST: Create new entries (authenticated users only)
+    
+    Access control:
+    - Authenticated users: Can see shared entries OR their own entries
+    - Unauthenticated users: Can only see shared entries
+    """
+    
     serializer_class = EntrySerializer
     pagination_class = PageNumberPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -55,9 +90,14 @@ class EntryListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        queryset = Entry.objects.all().select_related('author')
+        queryset = Entry.objects.all().select_related('author').prefetch_related('tags')
 
         if hasattr(self.request, 'user') and self.request.user.is_authenticated:
+            # Authenticated users can see all entries (or implement your specific logic)
+            # For now, let's show shared entries OR entries by the current user
+            queryset = queryset.filter(Q(shared=True) | Q(author=self.request.user))
+        else:
+            # Unauthenticated users can only see shared entries
             queryset = queryset.filter(shared=True)
 
         tag = self.request.query_params.get('tag', None)
@@ -112,14 +152,16 @@ class EntryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
                 status=status.HTTP_200_OK,
             )
         except exceptions.APIException as exc:
+            logger.warning(f"API Exception in entry deletion: {exc.detail}")
             return Response(
                 {"result": "Fail", "message": str(exc.detail)},
                 status=exc.status_code,
             )
         except Exception as exc:
+            logger.error(f"Unexpected error in entry deletion: {exc}", exc_info=True)
             return Response(
-                {"result": "Fail", "message": str(exc)},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"result": "Fail", "message": "An unexpected error occurred"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
@@ -146,7 +188,7 @@ class FavoriteListCreateView(generics.ListCreateAPIView):
     authentication_classes = [CustomTokenAuthentication]
 
     def get_queryset(self):
-        return Favorite.objects.filter(user=self.request.user).select_related('entry')
+        return Favorite.objects.filter(user=self.request.user).select_related('entry', 'user')
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -186,84 +228,232 @@ class UserFavoritesView(generics.ListAPIView):
 class UserCreateView(generics.CreateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
-    queryset = User.objects.all()
     queryset = get_user_model().objects.all()
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+        # Basic rate limiting by IP for registration
+        client_ip = self._get_client_ip(request)
+        if not client_ip or len(client_ip) > 45:  # IPv6 max length
+            logger.warning(f"Invalid IP address: {client_ip}")
+            return Response(
+                {'error': 'Invalid request'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        cache_key = f'registration_attempts_{client_ip}'
+        
+        # Allow 5 registration attempts per minute
+        attempts = cache.get(cache_key, 0)
+        if attempts >= 5:
+            logger.warning(f"Registration rate limit exceeded for IP: {client_ip}")
+            return Response(
+                {'error': 'Too many registration attempts. Please try again later.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        
+        cache.set(cache_key, attempts + 1, 60)  # 60 seconds timeout
+        
+        # Input validation - prevent excessively large payloads
+        try:
+            request_data = request.data.copy()
+            
+            # Validate input sizes to prevent DoS
+            if len(str(request_data)) > 10000:  # Reasonable limit
+                return Response(
+                    {'error': 'Request data too large'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except Exception as e:
+            logger.warning(f"Invalid request data format: {e}")
+            return Response(
+                {'error': 'Invalid request data format'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = self.get_serializer(data=request_data)
         serializer.is_valid(raise_exception=True)
 
         user_data = serializer.validated_data
         
+        # Validate username and email
+        username = user_data.get('username', '')
+        email = user_data.get('email', '')
+        
+        # Basic username validation
+        if not username or len(username) < 3 or len(username) > 150:
+            return Response(
+                {'error': 'Username must be between 3 and 150 characters'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Basic email validation if provided
+        if email and len(email) > 254:  # RFC 5321 max length
+            return Response(
+                {'error': 'Email address too long'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         # Handle different registration formats
-        password_data = request.data.get('password')
-        password_hash = request.data.get('password_hash')
-        salt = request.data.get('salt')
+        password_data = request_data.get('password', '')
+        password_hash = request_data.get('password_hash', '')
+        salt = request_data.get('salt', '')
+        
+        # Validate password data
+        if password_data:
+            # Legacy format: plain password (hash server-side)
+            if len(password_data) < 8:
+                return Response(
+                    {'error': 'Password must be at least 8 characters'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if len(password_data) > 128:
+                return Response(
+                    {'error': 'Password too long'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
         
         if password_hash and salt:
             # New secure format: password_hash + salt from Flutter client
-            user_data['password'] = password_hash
-            user_data['salt'] = salt
-        elif password_data:
-            # Legacy format: plain password (hash server-side)
-            # Use our custom password hashing with salt
-            user = User()
-            user.username = user_data['username']
-            user.email = user_data.get('email', '')
-            user.set_password(password_data)
-            user.save()
-            
-            return self._generate_auth_response(user)
-        else:
+            # Validate hash and salt formats
+            if not all(c in '0123456789abcdef' for c in password_hash):
+                return Response(
+                    {'error': 'Invalid password hash format'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if len(password_hash) != 64:  # SHA-256 hash should be 64 hex chars
+                return Response(
+                    {'error': 'Invalid password hash length'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if not all(c in '0123456789abcdef' for c in salt):
+                return Response(
+                    {'error': 'Invalid salt format'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if len(salt) != 32:  # 128-bit salt should be 32 hex chars
+                return Response(
+                    {'error': 'Invalid salt length'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        if not (password_data or (password_hash and salt)):
             return Response(
                 {'error': 'Either password or password_hash+salt required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Create user with hashed password and salt
-        user = User.objects.create_user(
-            username=user_data['username'],
-            email=user_data.get('email', ''),
-            password=user_data['password'],
-            salt=user_data.get('salt')
-        )
-        
-        return self._generate_auth_response(user)
+        try:
+            if password_hash and salt:
+                # New secure format: password_hash + salt from Flutter client
+                user = User.objects.create_user(
+                    username=user_data['username'],
+                    email=user_data.get('email', ''),
+                    password=password_hash,
+                    salt=salt
+                )
+                return self._generate_auth_response(user)
+            elif password_data:
+                # Legacy format: plain password (hash server-side)
+                # Use our custom password hashing with salt
+                user = User.objects.create_user(
+                    username=user_data['username'],
+                    email=user_data.get('email', '')
+                )
+                user.set_password(password_data)
+                user.save()
+                
+                return self._generate_auth_response(user)
+            else:
+                return Response(
+                    {'error': 'Either password or password_hash+salt required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+        except Exception as e:
+            logger.error(f"User creation failed: {e}", exc_info=True)
+            return Response(
+                {'error': 'User creation failed. Please try again.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     def _generate_auth_response(self, user):
         """Generate JWT tokens for authentication response"""
-        refresh = RefreshToken.for_user(user)
+        try:
+            refresh = RefreshToken.for_user(user)
+            
+            # Generate auth token
+            token = AuthToken.generate_token(user)
+
+            return Response({
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email
+                },
+                'tokens': {
+                    'access': str(refresh.access_token),
+                    'refresh': str(refresh),
+                    'access_expires': refresh.access_token.payload['exp'],
+                    'refresh_expires': refresh.payload['exp'],
+                },
+                'token': token.token,
+                'expires_at': token.expires_at.isoformat(),
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            logger.error(f"Token generation failed for user {user.username}: {e}", exc_info=True)
+            return Response(
+                {'error': 'Authentication token generation failed'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _get_client_ip(self, request):
+        """Get client IP address from request with validation"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            # Get first IP in the list (most trusted)
+            ip = x_forwarded_for.split(',')[0].strip()
+        else:
+            ip = request.META.get('REMOTE_ADDR', '')
         
-        # Hash password
-        user_data = serializer.validated_data
-        user_data['password'] = make_password(user_data['password'])
-
-        user = get_user_model().objects.create(**user_data)
-
-        # Generate auth token
-        token = AuthToken.generate_token(user)
-
-        return Response({
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email
-            },
-            'tokens': {
-                'access': str(refresh.access_token),
-                'refresh': str(refresh),
-                'access_expires': refresh.access_token.payload['exp'],
-                'refresh_expires': refresh.payload['exp'],
-            }
-            'token': token.token,
-            'expires_at': token.expires_at.isoformat(),
-        }, status=status.HTTP_201_CREATED)
+        # Basic IP validation
+        if not ip:
+            return None
+        
+        # Remove any port numbers or extra characters
+        ip = ip.split(':')[0].strip()
+        
+        # Validate IP format (basic check)
+        if len(ip) > 45:  # IPv6 max length
+            return None
+        
+        return ip
 
 
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
+        # Basic rate limiting by IP
+        client_ip = self._get_client_ip(request)
+        if not client_ip or len(client_ip) > 45:  # IPv6 max length
+            logger.warning(f"Invalid IP address: {client_ip}")
+            return Response(
+                {"error": "Invalid request"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        cache_key = f"login_attempts_{client_ip}"
+        # Allow 10 login attempts per minute
+        attempts = cache.get(cache_key, 0)
+        if attempts >= 10:
+            logger.warning(f"Rate limit exceeded for IP: {client_ip}")
+            return Response(
+                {'error': 'Too many login attempts. Please try again later.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        
+        cache.set(cache_key, attempts + 1, 60)  # 60 seconds timeout
+        
         # Handle different login formats
         if 'encrypted_credentials' in request.data:
             # New secure format: encrypted credentials
@@ -275,15 +465,57 @@ class LoginView(APIView):
             # Legacy format: plain credentials
             return self._handle_legacy_login(request)
     
+    def _get_client_ip(self, request):
+        """Get client IP address from request with validation"""
+        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+        if x_forwarded_for:
+            # Get first IP in the list (most trusted)
+            ip = x_forwarded_for.split(",")[0].strip()
+        else:
+            ip = request.META.get("REMOTE_ADDR", "")
+        
+        # Basic IP validation
+        if not ip:
+            return None
+        
+        # Remove any port numbers or extra characters
+        ip = ip.split(":")[0].strip()
+        
+        # Validate IP format (basic check)
+        if len(ip) > 45:  # IPv6 max length
+            return None
+        
+        return ip
     def _handle_encrypted_login(self, request):
         """Handle login with encrypted credentials"""
         encrypted_credentials = request.data.get('encrypted_credentials')
         decryption_key = request.data.get('decryption_key')
         key_type = request.data.get('key_type', 'fernet')
         
+        # Input validation
         if not encrypted_credentials or not decryption_key:
             return Response(
                 {'error': 'Both encrypted_credentials and decryption_key are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate key type
+        if key_type not in ['fernet', 'aes']:
+            return Response(
+                {'error': 'Unsupported key_type'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate input lengths to prevent DoS
+        if len(encrypted_credentials) > 10000:  # Reasonable limit for encrypted data
+            return Response(
+                {'error': 'Encrypted credentials too large'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if len(decryption_key) > 1000:  # Reasonable limit for decryption keys
+            return Response(
+                {'error': 'Decryption key too large'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -293,20 +525,29 @@ class LoginView(APIView):
                 decrypted_data = SecurityUtils.decrypt_with_fernet(encrypted_credentials, decryption_key)
             elif key_type == 'aes':
                 decrypted_data = SecurityUtils.decrypt_with_aes(encrypted_credentials, decryption_key)
-            else:
+            
+            # Parse decrypted credentials
+            try:
+                credentials = json.loads(decrypted_data)
+            except json.JSONDecodeError:
                 return Response(
-                    {'error': 'Unsupported key_type'},
+                    {'error': 'Invalid decrypted data format'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Parse decrypted credentials
-            credentials = json.loads(decrypted_data)
             username = credentials.get('username')
             password = credentials.get('password')
             
             if not username or not password:
                 return Response(
                     {'error': 'Invalid decrypted credentials format'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate username and password lengths
+            if len(username) > 150 or len(password) > 128:
+                return Response(
+                    {'error': 'Invalid credential lengths'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -325,7 +566,7 @@ class LoginView(APIView):
             print(f"Frontend login error: {e}")
             traceback.print_exc()
             return Response(
-                {'error': f'Decryption failed: {str(e)}'},
+                {'error': 'Decryption failed'},
                 status=status.HTTP_400_BAD_REQUEST
             )
     
@@ -405,49 +646,69 @@ class LoginView(APIView):
         try:
             user = User.objects.get(username=username)
             
-            # Check if user has salt (new format)
-            if user.salt:
-                # Use our custom password verification
-                if SecurityUtils.verify_password(password, user.password, user.salt):
-                    return user
-            else:
-                # Fallback to Django's default authentication for legacy users
+            # Log for debugging (be careful not to log full password in production)
+            # Masking password for security
+            masked_password = password[:2] + '*' * (len(password) - 2) if len(password) > 2 else '***'
+            print(f"Authenticating user: {username}")
+            print(f"Stored hash: {user.password[:10]}...")
+            print(f"Stored salt: {user.salt}")
+            print(f"Provided (decrypted) password starts with: {masked_password[:10]}...")
+
+            # First try Django's default authentication (for legacy users)
+            if not user.salt:
                 if user.check_password(password):
+                    print("Legacy authentication successful")
                     return user
             
+            # Then try custom password verification (for new format users)
+            if user.salt:
+                if SecurityUtils.verify_password(password, user.password, user.salt):
+                    print("Custom authentication successful")
+                    return user
+            
+            print("Authentication failed")
             return None
         except User.DoesNotExist:
+            print(f"User {username} not found")
             return None
     
     def _decrypt_frontend_format(self, encrypted_json, key_base64):
-        """Decrypt data encrypted in frontend's JSON format: {"iv": "...", "data": "..."}"""
-        import base64
+        """Decrypt data encrypted in frontend's JSON format"""
         import json
-        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-        from cryptography.hazmat.backends import default_backend
         
-        # Parse the JSON
-        data = json.loads(encrypted_json)
-        iv = base64.urlsafe_b64decode(data['iv'])
-        encrypted_data = base64.urlsafe_b64decode(data['data'])
+        try:
+            # Try parsing as JSON
+            payload = json.loads(encrypted_json)
+        except (ValueError, TypeError):
+            # If not JSON, it might be the old format (nonce+tag+ciphertext)
+            return SecurityUtils.decrypt_with_aes(encrypted_json, key_base64)
+
+        # Check if it's the new format (iv, data, keyFingerprint)
+        if 'iv' in payload and 'data' in payload:
+            return SecurityUtils.decrypt_aes_gcm_with_format(payload, key_base64)
         
-        # Decode key from base64
-        key_bytes = base64.b64decode(key_base64.encode('utf-8'))
-        
-        # Decrypt
-        cipher = Cipher(
-            algorithms.AES(key_bytes),
-            modes.CBC(iv),
-            backend=default_backend()
-        )
-        decryptor = cipher.decryptor()
-        decrypted_padded = decryptor.update(encrypted_data) + decryptor.finalize()
-        
-        # Remove padding
-        pad_length = decrypted_padded[-1]
-        decrypted = decrypted_padded[:-pad_length]
-        
-        return decrypted.decode('utf-8')
+        # Check if it's the other frontend format (nonce, tag, data)
+        if 'nonce' in payload and 'tag' in payload and 'data' in payload:
+            import base64
+            from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+            from cryptography.hazmat.backends import default_backend
+            
+            nonce = base64.urlsafe_b64decode(payload['nonce'])
+            tag = base64.urlsafe_b64decode(payload['tag'])
+            encrypted_data = base64.urlsafe_b64decode(payload['data'])
+            
+            key_bytes = base64.b64decode(key_base64.encode('utf-8'))
+            
+            cipher = Cipher(
+                algorithms.AES(key_bytes),
+                modes.GCM(nonce, tag),
+                backend=default_backend()
+            )
+            decryptor = cipher.decryptor()
+            decrypted = decryptor.update(encrypted_data) + decryptor.finalize()
+            return decrypted.decode('utf-8')
+            
+        raise ValueError("Unknown encrypted data format")
 
     def _generate_jwt_response(self, user):
         """Generate JWT tokens for authentication response"""
@@ -470,9 +731,7 @@ class LoginView(APIView):
 
 class LogoutView(APIView):
     def post(self, request):
-        # For JWT, logout is typically handled client-side by removing tokens
-        # But we can implement token blacklisting if needed
-        return Response({'message': 'Logout successful - remove tokens client-side'}, status=status.HTTP_200_OK)
+        # Handle token-based authentication logout
         auth_header = request.headers.get('Authorization')
         if auth_header and auth_header.startswith('Token '):
             token_key = auth_header.split(' ')[1]
@@ -483,7 +742,8 @@ class LogoutView(APIView):
             except AuthToken.DoesNotExist:
                 pass
 
-        return Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
+        # For JWT, logout is typically handled client-side by removing tokens
+        return Response({'message': 'Logout successful - remove tokens client-side'}, status=status.HTTP_200_OK)
 
 
 class TokenRefreshView(APIView):
@@ -520,15 +780,22 @@ def custom_exception_handler(exc, context):
     response = exception_handler(exc, context)
 
     if response is not None:
+        # Log the original error for debugging
+        logger.warning(f"API Exception: {exc}")
+        
         response.data = {
             'error': True,
-            'message': response.data.get('detail', str(exc)),
+            'message': response.data.get('detail', 'An error occurred'),
             'status_code': response.status_code,
         }
     else:
+        # Log unexpected errors for debugging
+        logger.error(f"Unexpected error: {exc}", exc_info=True)
+        
+        # For unexpected errors, return a generic message to avoid information leakage
         response = Response({
             'error': True,
-            'message': str(exc),
+            'message': 'An unexpected error occurred',
             'status_code': status.HTTP_500_INTERNAL_SERVER_ERROR,
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
