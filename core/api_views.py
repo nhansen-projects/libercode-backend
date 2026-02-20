@@ -77,6 +77,7 @@ class EntryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = EntrySerializer
     queryset = Entry.objects.all()
     authentication_classes = [CustomTokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -88,6 +89,38 @@ class EntryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
             )
 
         return queryset
+
+    def perform_update(self, serializer):
+        entry = self.get_object()
+        # Only allow the author to update their own entry
+        if entry.author != self.request.user and not self.request.user.is_staff:
+            raise exceptions.PermissionDenied("You can only edit your own entries.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        # Only allow the author to delete their own entry
+        if instance.author != self.request.user and not self.request.user.is_staff:
+            raise exceptions.PermissionDenied("You can only delete your own entries.")
+        instance.delete()
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            self.perform_destroy(instance)
+            return Response(
+                {"result": "Success", "message": "Entry deleted successfully."},
+                status=status.HTTP_200_OK,
+            )
+        except exceptions.APIException as exc:
+            return Response(
+                {"result": "Fail", "message": str(exc.detail)},
+                status=exc.status_code,
+            )
+        except Exception as exc:
+            return Response(
+                {"result": "Fail", "message": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class TagListCreateView(generics.ListCreateAPIView):
@@ -131,6 +164,7 @@ class UserEntriesView(generics.ListAPIView):
     serializer_class = EntrySerializer
     pagination_class = PageNumberPagination
     authentication_classes = [CustomTokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
@@ -141,6 +175,7 @@ class UserFavoritesView(generics.ListAPIView):
     serializer_class = FavoriteSerializer
     pagination_class = PageNumberPagination
     authentication_classes = [CustomTokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
@@ -152,6 +187,7 @@ class UserCreateView(generics.CreateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
     queryset = User.objects.all()
+    queryset = get_user_model().objects.all()
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -198,6 +234,15 @@ class UserCreateView(generics.CreateAPIView):
         """Generate JWT tokens for authentication response"""
         refresh = RefreshToken.for_user(user)
         
+        # Hash password
+        user_data = serializer.validated_data
+        user_data['password'] = make_password(user_data['password'])
+
+        user = get_user_model().objects.create(**user_data)
+
+        # Generate auth token
+        token = AuthToken.generate_token(user)
+
         return Response({
             'user': {
                 'id': user.id,
@@ -210,6 +255,8 @@ class UserCreateView(generics.CreateAPIView):
                 'access_expires': refresh.access_token.payload['exp'],
                 'refresh_expires': refresh.payload['exp'],
             }
+            'token': token.token,
+            'expires_at': token.expires_at.isoformat(),
         }, status=status.HTTP_201_CREATED)
 
 
@@ -426,6 +473,17 @@ class LogoutView(APIView):
         # For JWT, logout is typically handled client-side by removing tokens
         # But we can implement token blacklisting if needed
         return Response({'message': 'Logout successful - remove tokens client-side'}, status=status.HTTP_200_OK)
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Token '):
+            token_key = auth_header.split(' ')[1]
+            try:
+                token = AuthToken.objects.get(token=token_key)
+                token.delete()
+                return Response({'message': 'Successfully logged out'})
+            except AuthToken.DoesNotExist:
+                pass
+
+        return Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
 
 
 class TokenRefreshView(APIView):
