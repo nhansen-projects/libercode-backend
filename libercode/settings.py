@@ -161,16 +161,23 @@ if not SIMPLE_JWT['SIGNING_KEY']:
     raise ValueError("JWT_SIGNING_KEY must be set in environment variables for security reasons")
 
 # CORS settings - restrictive by default for security
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8080",  # Flutter dev server
-    "http://127.0.0.1:8080",
-    "http://localhost:3000",  # Common React dev server
-    "http://127.0.0.1:3000",
-    "http://localhost:35237", # Current Flutter dev server
-    "http://127.0.0.1:35237",
-    "http://localhost:8000",  # Local backend testing
-    "http://127.0.0.1:8000",
-]
+def get_cors_origins(is_debug):
+    base_origins = [
+        "localhost:8080",  # Flutter dev server
+        "127.0.0.1:8080",
+        "localhost:3000",  # Common React dev server
+        "127.0.0.1:3000",
+        "localhost:35237", # Current Flutter dev server
+        "127.0.0.1:35237",
+        "localhost:8000",  # Local backend testing
+        "127.0.0.1:8000",
+        "localhost:36661",  # Flutter dev server port
+        "127.0.0.1:36661",
+    ]
+    protocol = "http://" if is_debug else "https://"
+    return [f"{protocol}{origin}" for origin in base_origins]
+
+CORS_ALLOWED_ORIGINS = get_cors_origins(DEBUG)
 
 CORS_ALLOW_METHODS = [
     "DELETE",
@@ -192,9 +199,11 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
 ]
+# TODO: DEV ONLY - REMOVE IN PRODUCTION!!!
+# should be Disabled for security - use explicit allowed origins only
+CORS_ALLOW_ALL_ORIGINS = True  # TODO: Allow only in development
 
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = False  # Disabled for security - use explicit allowed origins only
+CORS_ALLOW_CREDENTIALS = False
 
 # Custom JWT-like token settings (simplified for this implementation)
 # In a production environment, you would use djangorestframework-simplejwt
@@ -202,3 +211,23 @@ SIMPLE_AUTH = {
     'TOKEN_LIFETIME': 3600,  # 1 hour in seconds
     'REFRESH_TOKEN_LIFETIME': 86400,  # 1 day in seconds
 }
+
+# For dev http
+SECURE_SSL_REDIRECT = False
+
+# HTTPS and security headers
+"""
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = (os.environ.get('SECURE_SSL_REDIRECT', 'True') == 'True') if not DEBUG else False
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000')) if not DEBUG else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'no-referrer'
+X_FRAME_OPTIONS = 'DENY'
+
+# Trust these origins for CSRF (needed when using HTTPS and different domain/port frontends)
+CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', ','.join(CORS_ALLOWED_ORIGINS)).split(',')
+"""
