@@ -247,9 +247,7 @@ class LoginView(APIView):
             )
 
         # Generate/refresh token
-        token, created = AuthToken.objects.get_or_create(user=user)
-        if not created:
-            token.extend()
+        token = AuthToken.generate_token(user)
 
         return Response({
             'user': {
@@ -263,6 +261,8 @@ class LoginView(APIView):
 
 
 class LogoutView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
     def post(self, request):
         auth_header = request.headers.get('Authorization')
         if auth_header and auth_header.startswith('Token '):
