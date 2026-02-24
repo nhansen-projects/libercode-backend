@@ -6,10 +6,28 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth.forms import UserCreationForm
 from django import forms
-from django.contrib.auth import get_user_model
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate, login
 from .models import Entry, Tag, Favorite
 from django.db.models import Q
+from django.contrib.auth.views import LoginView as DjangoLoginView
+
+class CustomLoginView(DjangoLoginView):
+    template_name = 'registration/login.html'
+    
+    def form_valid(self, form):
+        """
+        Handle successful form submission.
+        We ensure that login() is called correctly with our custom user.
+        """
+        username = form.cleaned_data.get('username')
+        password = form.cleaned_data.get('password')
+        
+        user = authenticate(self.request, username=username, password=password)
+        if user is not None:
+            login(self.request, user)
+            return redirect(self.get_success_url())
+        else:
+            return self.form_invalid(form)
 
 class EntryListView(ListView):
     model = Entry
