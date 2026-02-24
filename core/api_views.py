@@ -2,6 +2,8 @@ from rest_framework import generics, permissions, status, exceptions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.authentication import BaseAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from django.db import models
@@ -23,7 +25,7 @@ from django.core.cache import cache
 logger = logging.getLogger(__name__)
 
 
-class CustomTokenAuthentication:
+class CustomTokenAuthentication(BaseAuthentication):
     """
     Custom token authentication using AuthToken model.
     
@@ -86,7 +88,7 @@ class EntryListCreateView(generics.ListCreateAPIView):
     search_fields = ['title', 'body', 'tags__value']
     ordering_fields = ['title', 'created_at', 'shared']
     ordering = ['-created_at']
-    authentication_classes = [CustomTokenAuthentication]
+    authentication_classes = [CustomTokenAuthentication, JWTAuthentication]
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
@@ -116,7 +118,7 @@ class EntryListCreateView(generics.ListCreateAPIView):
 class EntryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = EntrySerializer
     queryset = Entry.objects.all()
-    authentication_classes = [CustomTokenAuthentication]
+    authentication_classes = [CustomTokenAuthentication, JWTAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
@@ -173,19 +175,19 @@ class TagListCreateView(generics.ListCreateAPIView):
     search_fields = ['value']
     ordering_fields = ['value', 'created_at']
     ordering = ['value']
-    authentication_classes = [CustomTokenAuthentication]
+    authentication_classes = [CustomTokenAuthentication, JWTAuthentication]
 
 
 class TagRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = TagSerializer
     queryset = Tag.objects.all()
-    authentication_classes = [CustomTokenAuthentication]
+    authentication_classes = [CustomTokenAuthentication, JWTAuthentication]
 
 
 class FavoriteListCreateView(generics.ListCreateAPIView):
     serializer_class = FavoriteSerializer
     pagination_class = PageNumberPagination
-    authentication_classes = [CustomTokenAuthentication]
+    authentication_classes = [CustomTokenAuthentication, JWTAuthentication]
 
     def get_queryset(self):
         return Favorite.objects.filter(user=self.request.user).select_related('entry', 'user')
@@ -196,7 +198,7 @@ class FavoriteListCreateView(generics.ListCreateAPIView):
 
 class FavoriteRetrieveDestroyView(generics.RetrieveDestroyAPIView):
     serializer_class = FavoriteSerializer
-    authentication_classes = [CustomTokenAuthentication]
+    authentication_classes = [CustomTokenAuthentication, JWTAuthentication]
 
     def get_queryset(self):
         return Favorite.objects.filter(user=self.request.user)
@@ -205,7 +207,7 @@ class FavoriteRetrieveDestroyView(generics.RetrieveDestroyAPIView):
 class UserEntriesView(generics.ListAPIView):
     serializer_class = EntrySerializer
     pagination_class = PageNumberPagination
-    authentication_classes = [CustomTokenAuthentication]
+    authentication_classes = [CustomTokenAuthentication, JWTAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
@@ -216,7 +218,7 @@ class UserEntriesView(generics.ListAPIView):
 class UserFavoritesView(generics.ListAPIView):
     serializer_class = FavoriteSerializer
     pagination_class = PageNumberPagination
-    authentication_classes = [CustomTokenAuthentication]
+    authentication_classes = [CustomTokenAuthentication, JWTAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
