@@ -7,6 +7,7 @@ from rest_framework import filters
 from django.db import models
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.hashers import make_password
+from django.db import IntegrityError
 from django.utils import timezone
 from .models import Entry, Tag, Favorite, AuthToken
 from .serializers import EntrySerializer, TagSerializer, FavoriteSerializer, UserSerializer
@@ -186,13 +187,29 @@ class UserCreateView(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+
+        if not serializer.is_valid():
+            username_errors = serializer.errors.get('username', [])
+            if username_errors:
+                duplicate_username = any('exist' in str(error).lower() for error in username_errors)
+                if duplicate_username:
+                    return Response(
+                        {'error': 'A user with that username already exists.'},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         # Hash password
         user_data = serializer.validated_data
         user_data['password'] = make_password(user_data['password'])
 
-        user = get_user_model().objects.create(**user_data)
+        try:
+            user = get_user_model().objects.create(**user_data)
+        except IntegrityError:
+            return Response(
+                {'error': 'A user with that username already exists.'},
+                status=status.HTTP_409_CONFLICT,
+            )
 
         # Generate auth token
         token = AuthToken.generate_token(user)
@@ -230,9 +247,7 @@ class LoginView(APIView):
             )
 
         # Generate/refresh token
-        token, created = AuthToken.objects.get_or_create(user=user)
-        if not created:
-            token.extend()
+        token = AuthToken.generate_token(user)
 
         return Response({
             'user': {
@@ -246,6 +261,8 @@ class LoginView(APIView):
 
 
 class LogoutView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
     def post(self, request):
         auth_header = request.headers.get('Authorization')
         if auth_header and auth_header.startswith('Token '):
