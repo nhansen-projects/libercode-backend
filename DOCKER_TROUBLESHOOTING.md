@@ -87,7 +87,7 @@ The Dockerfile now includes `netcat` installation. If you're still seeing this:
 docker-compose build --no-cache
 ```
 
-2. The entrypoint script has a fallback method using Python sockets, so it should work even without `nc`.
+2. The database service has a healthcheck in `docker-compose.yml`, so the application will wait until it's ready before starting.
 
 ### 3. Database Connection Issues
 
@@ -119,11 +119,14 @@ Connect to the database manually:
 docker-compose exec db psql -U admin -d notesDB
 ```
 
-#### Solution D: Increase wait time
-Modify the entrypoint script to wait longer:
-```bash
-# In entrypoint.sh, change:
-sleep 5  # Increase to sleep 10 or sleep 15
+#### Solution D: Increase database startup time
+If the database takes longer to start, you can adjust the `healthcheck` settings in `docker-compose.yml`:
+```yaml
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d notesDB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 ```
 
 ### 4. Static Files Collection Issues
@@ -150,15 +153,7 @@ RUN mkdir -p /app/staticfiles
 ```
 
 #### Solution C: Skip collectstatic in development
-Modify the entrypoint script to skip collectstatic in DEBUG mode:
-
-```bash
-# In entrypoint.sh:
-if [ "$DEBUG" != "1" ]; then
-    echo "Collecting static files..."
-    python manage.py collectstatic --noinput
-fi
-```
+If you want to skip `collectstatic` during development, you can modify the `command` in `docker-compose.yml` to remove it.
 
 ### 5. Debugging Tips
 
