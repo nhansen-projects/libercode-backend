@@ -1,7 +1,47 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
 from django.urls import reverse
 from django.utils.html import format_html
 from . import models
+
+
+@admin.register(models.User)
+class CustomUserAdmin(UserAdmin):
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'date_joined')
+    list_filter = ('is_staff', 'is_superuser', 'is_active', 'groups')
+    search_fields = ('username', 'first_name', 'last_name', 'email')
+    ordering = ('username',)
+    fieldsets = (
+        (None, {'fields': ('username', 'password')}),
+        ('Personal info', {'fields': ('first_name', 'last_name', 'email')}),
+        ('Permissions', {
+            'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
+        }),
+        ('Important dates', {'fields': ('last_login', 'date_joined')}),
+    )
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('username', 'password1', 'password2', 'email', 'first_name', 'last_name', 'is_active', 'is_staff', 'is_superuser'),
+        }),
+    )
+
+
+@admin.register(models.EncryptionKey)
+class EncryptionKeyAdmin(admin.ModelAdmin):
+    list_display = ('id', 'key_type', 'is_active', 'created_at', 'deactivated_at', 'description')
+    list_filter = ('key_type', 'is_active')
+    search_fields = ('description',)
+    readonly_fields = ('key', 'created_at', 'deactivated_at')
+    fieldsets = (
+        (None, {
+            'fields': ('key_type', 'is_active', 'description')
+        }),
+        ('Key Information', {
+            'fields': ('key', 'created_at', 'deactivated_at'),
+            'classes': ('collapse',)
+        }),
+    )
 
 
 @admin.register(models.Tag)

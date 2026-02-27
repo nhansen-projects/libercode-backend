@@ -2,44 +2,40 @@ from django.urls import path, include
 from . import views
 from django.contrib.auth import views as auth_views
 
-# Try to import API views, but don't fail if REST framework is not installed
-try:
-    from . import api_views
-    from rest_framework.routers import DefaultRouter
-    
-    # Create a router for API views
-    router = DefaultRouter()
-    
-    api_urls = [
-        # Authentication URLs
-        path('api/register/', api_views.UserCreateView.as_view(), name='api-register'),
-        path('api/login/', api_views.LoginView.as_view(), name='api-login'),
-        path('api/logout/', api_views.LogoutView.as_view(), name='api-logout'),
-        path('api/token/refresh/', api_views.TokenRefreshView.as_view(), name='api-token-refresh'),
-        
-        # API URLs
-        path('api/entries/', api_views.EntryListCreateView.as_view(), name='api-entry-list'),
-        path('api/entries/<int:pk>/', api_views.EntryRetrieveUpdateDestroyView.as_view(), name='api-entry-detail'),
-        
-        path('api/tags/', api_views.TagListCreateView.as_view(), name='api-tag-list'),
-        path('api/tags/<int:pk>/', api_views.TagRetrieveUpdateDestroyView.as_view(), name='api-tag-detail'),
-        
-        path('api/favorites/', api_views.FavoriteListCreateView.as_view(), name='api-favorite-list'),
-        path('api/favorites/<int:pk>/', api_views.FavoriteRetrieveDestroyView.as_view(), name='api-favorite-detail'),
-        
-        path('api/me/entries/', api_views.UserEntriesView.as_view(), name='api-user-entries'),
-        path('api/me/favorites/', api_views.UserFavoritesView.as_view(), name='api-user-favorites'),
-    ]
-except ImportError:
-    # REST framework not installed, no API URLs
-    api_urls = []
+# Import API views unconditionally; if import fails, it's a real setup error we should see
+from . import api_views
+from rest_framework.routers import DefaultRouter
+
+# Create a router for API views (reserved for future use)
+router = DefaultRouter()
+
+api_urls = [
+    # Authentication URLs
+    path('api/register/', api_views.UserCreateView.as_view(), name='api-register'),
+    path('api/login/', api_views.LoginView.as_view(), name='api-login'),
+    path('api/logout/', api_views.LogoutView.as_view(), name='api-logout'),
+    path('api/token/refresh/', api_views.TokenRefreshView.as_view(), name='api-token-refresh'),
+
+    # API URLs
+    path('api/entries/', api_views.EntryListCreateView.as_view(), name='api-entry-list'),
+    path('api/entries/<int:pk>/', api_views.EntryRetrieveUpdateDestroyView.as_view(), name='api-entry-detail'),
+
+    path('api/tags/', api_views.TagListCreateView.as_view(), name='api-tag-list'),
+    path('api/tags/<int:pk>/', api_views.TagRetrieveUpdateDestroyView.as_view(), name='api-tag-detail'),
+
+    path('api/favorites/', api_views.FavoriteListCreateView.as_view(), name='api-favorite-list'),
+    path('api/favorites/<int:pk>/', api_views.FavoriteRetrieveDestroyView.as_view(), name='api-favorite-detail'),
+
+    path('api/me/entries/', api_views.UserEntriesView.as_view(), name='api-user-entries'),
+    path('api/me/favorites/', api_views.UserFavoritesView.as_view(), name='api-user-favorites'),
+]
 
 urlpatterns = [
     # Root URL - redirect to entry list
     path('', views.EntryListView.as_view(), name='home'),
     
     # Authentication URLs
-    path('accounts/login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
+    path('accounts/login/', views.CustomLoginView.as_view(), name='login'),
     path('accounts/logout/', views.CustomLogoutView.as_view(), name='logout'),
     path('accounts/register/', views.RegisterView.as_view(), name='register'),
     path('accounts/profile/', views.ProfileView.as_view(), name='profile'),

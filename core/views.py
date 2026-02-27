@@ -5,9 +5,29 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth import get_user_model
+from django import forms
+from django.contrib.auth import get_user_model, authenticate, login
 from .models import Entry, Tag, Favorite
 from django.db.models import Q
+from django.contrib.auth.views import LoginView as DjangoLoginView
+
+class CustomLoginView(DjangoLoginView):
+    template_name = 'registration/login.html'
+    
+    def form_valid(self, form):
+        """
+        Handle successful form submission.
+        We ensure that login() is called correctly with our custom user.
+        """
+        username = form.cleaned_data.get('username')
+        password = form.cleaned_data.get('password')
+        
+        user = authenticate(self.request, username=username, password=password)
+        if user is not None:
+            login(self.request, user)
+            return redirect(self.get_success_url())
+        else:
+            return self.form_invalid(form)
 
 class EntryListView(ListView):
     model = Entry
@@ -150,11 +170,57 @@ class APIDocumentationView(TemplateView):
         return context
 
 
+class CustomUserCreationForm(forms.ModelForm):
+    """
+    Custom user creation form that works with our custom User model
+    """
+    password1 = forms.CharField(
+        label="Password",
+        strip=False,
+        widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
+        help_text="Enter a strong password",
+    )
+    password2 = forms.CharField(
+        label="Password confirmation",
+        widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
+        strip=False,
+        help_text="Enter the same password as before, for verification.",
+    )
+    
+    class Meta:
+        model = get_user_model()
+        fields = ('username', 'email')
+        help_texts = {
+            'username': None,  # Remove default username help text
+        }
+    
+    def clean_password2(self):
+        password1 = self.cleaned_data.get("password1")
+        password2 = self.cleaned_data.get("password2")
+        if password1 and password2 and password1 != password2:
+            raise forms.ValidationError(
+                self.error_messages['password_mismatch'],
+                code='password_mismatch',
+            )
+        return password2
+    
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.set_password(self.cleaned_data["password1"])
+        if commit:
+            user.save()
+        return user
+    
+    error_messages = {
+        'password_mismatch': 'The two password fields didn’t match.',
+    }
+
+
 class RegisterView(CreateView):
     """
     User registration view
     """
-    form_class = UserCreationForm
+    form_class = CustomUserCreationForm
     template_name = 'registration/register.html'
     success_url = reverse_lazy('login')
     
