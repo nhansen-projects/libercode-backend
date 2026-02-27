@@ -1,4 +1,7 @@
 # Docker Configuration Troubleshooting Guide
+              
+For all intents and purposes, the docker files should work out of the box, but since we've experienced issues with Docker and Docker Compose over the course of development, we've compiled this guide as references to troubleshoot common problems in development environments.
+Please note that this is intended for development builds and not for production use. If things don't work out of the box for prod, there are likely far more important issues to resolve, and it should not be used in any kind of production.
 
 ## Common Issues and Solutions
 
@@ -68,7 +71,7 @@ cp Dockerfile.alternative Dockerfile
 docker-compose build --no-cache
 ```
 
-**⚠️ WARNING:** The alternative Dockerfile embeds environment variables in the image, which is **not secure for production**. Use only for development.
+**WARNING:** The alternative Dockerfile embeds environment variables in the image, which is **not secure for production**. Use only for development.
 
 ### 2. "nc: not found" Error
 
@@ -223,16 +226,16 @@ docker-compose up
 
 ## Production Deployment Checklist
 
-1. ✅ Use proper secrets management (AWS Secrets Manager, HashiCorp Vault, etc.)
-2. ✅ Never embed secrets in Docker images
-3. ✅ Use different secrets for each environment
-4. ✅ Rotate secrets regularly
-5. ✅ Use HTTPS and secure cookie settings
-6. ✅ Set `DEBUG=False` in production
-7. ✅ Configure proper ALLOWED_HOSTS
-8. ✅ Set up proper database backups
-9. ✅ Configure logging and monitoring
-10. ✅ Use a production-ready web server (gunicorn, uwsgi)
+1. db_query_simple.py Use proper secrets management (AWS Secrets Manager, HashiCorp Vault, etc.)
+2. Never embed secrets in Docker images
+3. Use different secrets for each environment
+4. Rotate secrets regularly
+5. Use HTTPS and secure cookie settings
+6. Set `DEBUG=False` in production
+7. Configure proper ALLOWED_HOSTS
+8. Set up proper database backups
+9. Configure logging and monitoring
+10. Use a production-ready web server (gunicorn, uwsgi)
 
 ## Getting Help
 
