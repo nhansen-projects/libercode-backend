@@ -52,10 +52,16 @@ class FavoriteSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField()
     entry = EntrySerializer(read_only=True)
     entry_id = serializers.PrimaryKeyRelatedField(
-        queryset=Entry.objects.all(), 
+        queryset=Entry.objects.none(), 
         source='entry',
         write_only=True
     )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            self.fields['entry_id'].queryset = Entry.objects.filter(author=request.user)
     
     class Meta:
         model = Favorite

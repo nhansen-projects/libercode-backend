@@ -83,6 +83,12 @@ class EntryAdmin(admin.ModelAdmin):
         return ", ".join([tag.value for tag in obj.tags.all()])
     tag_list.short_description = "Tags"
     
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(author=request.user)
+
     def view_on_site_link(self, obj):
         if obj.pk:
             try:
@@ -116,3 +122,9 @@ class FavoriteAdmin(admin.ModelAdmin):
         return obj.entry.title
     entry_title.short_description = "Entry Title"
     entry_title.admin_order_field = "entry__title"
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(user=request.user)
