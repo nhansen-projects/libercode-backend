@@ -29,15 +29,18 @@ class CustomLoginView(DjangoLoginView):
         else:
             return self.form_invalid(form)
 
-class EntryListView(ListView):
+class EntryListView(LoginRequiredMixin, ListView):
     model = Entry
     template_name = 'core/entry_list.html'
     context_object_name = 'entries'
     paginate_by = 10
     
     def get_queryset(self):
-        queryset = Entry.objects.all().order_by('-created_at')
+        if not self.request.user.is_authenticated:
+            return Entry.objects.none()
         
+        queryset = Entry.objects.filter(Q(author=self.request.user) | Q(shared=True)).distinct().order_by('-created_at')
+
         # Filter by search query
         search_query = self.request.GET.get('q')
         if search_query:
@@ -54,10 +57,14 @@ class EntryListView(ListView):
         
         return queryset
 
-class EntryDetailView(DetailView):
+class EntryDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = Entry
     template_name = 'core/entry_detail.html'
     context_object_name = 'entry'
+    
+    def test_func(self):
+        entry = self.get_object()
+        return self.request.user == entry.author
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -105,13 +112,13 @@ class EntryDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         entry = self.get_object()
         return self.request.user == entry.author
 
-class TagListView(ListView):
+class TagListView(LoginRequiredMixin, ListView):
     model = Tag
     template_name = 'core/tag_list.html'
     context_object_name = 'tags'
     paginate_by = 20
 
-class TagDetailView(DetailView):
+class TagDetailView(LoginRequiredMixin, DetailView):
     model = Tag
     template_name = 'core/tag_detail.html'
     context_object_name = 'tag'
@@ -119,7 +126,10 @@ class TagDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         tag = self.get_object()
-        context['entries'] = Entry.objects.filter(tags=tag).order_by('-created_at')
+        context['entries'] = Entry.objects.filter(
+            tags=tag,
+            author=self.request.user
+        ).order_by('-created_at')
         return context
 
 class TagCreateView(LoginRequiredMixin, CreateView):

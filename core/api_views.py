@@ -89,18 +89,10 @@ class EntryListCreateView(generics.ListCreateAPIView):
     ordering_fields = ['title', 'created_at', 'shared']
     ordering = ['-created_at']
     authentication_classes = [CustomTokenAuthentication, JWTAuthentication]
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        queryset = Entry.objects.all().select_related('author').prefetch_related('tags')
-
-        if hasattr(self.request, 'user') and self.request.user.is_authenticated:
-            # Authenticated users can see all entries (or implement your specific logic)
-            # For now, let's show shared entries OR entries by the current user
-            queryset = queryset.filter(Q(shared=True) | Q(author=self.request.user))
-        else:
-            # Unauthenticated users can only see shared entries
-            queryset = queryset.filter(shared=True)
+        queryset = Entry.objects.filter(author=self.request.user).select_related('author').prefetch_related('tags')
 
         tag = self.request.query_params.get('tag', None)
         if tag:
@@ -122,27 +114,12 @@ class EntryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-
-        # Only allow users to access their own entries unless shared
-        if not self.request.user.is_staff:
-            queryset = queryset.filter(
-                models.Q(author=self.request.user) | models.Q(shared=True)
-            )
-
-        return queryset
+        return Entry.objects.filter(author=self.request.user)
 
     def perform_update(self, serializer):
-        entry = self.get_object()
-        # Only allow the author to update their own entry
-        if entry.author != self.request.user and not self.request.user.is_staff:
-            raise exceptions.PermissionDenied("You can only edit your own entries.")
         serializer.save()
 
     def perform_destroy(self, instance):
-        # Only allow the author to delete their own entry
-        if instance.author != self.request.user and not self.request.user.is_staff:
-            raise exceptions.PermissionDenied("You can only delete your own entries.")
         instance.delete()
 
     def destroy(self, request, *args, **kwargs):
