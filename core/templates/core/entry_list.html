@@ -33,7 +33,7 @@
         </div>
         <div>
             <a href="{% url 'entry-detail' entry.pk %}" class="btn btn-secondary">Read More</a>
-            {% if user.is_authenticated and user == entry.author %}
+            {% if user.is_authenticated and user == entry.is_owned_by %}
                 <a href="{% url 'entry-update' entry.pk %}" class="btn">Edit</a>
                 <a href="{% url 'entry-delete' entry.pk %}" class="btn btn-danger">Delete</a>
             {% endif %}
