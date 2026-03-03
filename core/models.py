@@ -190,6 +190,7 @@ class Tag(models.Model):
 class Entry(models.Model):
     title = models.CharField(max_length=255)
     body = models.TextField(help_text="Content of the post")
+    document = models.JSONField(null=True, blank=True)  # rich-text JSON document
     shared = models.BooleanField(default=False)
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
