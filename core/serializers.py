@@ -36,15 +36,15 @@ class EntrySerializer(serializers.ModelSerializer):
         return False
 
     def _resolve_tags_from_input(self, validated_data):
-        # 1) Preferred: tag_ids input (mapped to 'tags' via source='tags')
+        # 1) Preferred: tag_ids input (mapped to 'tags')
         tags_from_ids = validated_data.pop('tags', None)
         if tags_from_ids is not None:
             return list(tags_from_ids)
 
-        # 2) Fallback: raw "tags": ["Tes", ...] from frontend
+        # 2) Fallback: raw "tags": ["Tes", ...] from frontend (Less efficient.)
         raw_tags = self.initial_data.get('tags', None)
         if raw_tags is None:
-            return None  # omitted => do not change existing tags on update
+            return None
 
         if isinstance(raw_tags, str):
             raw_tags = [raw_tags]
@@ -58,11 +58,11 @@ class EntrySerializer(serializers.ModelSerializer):
             if not isinstance(item, str):
                 raise serializers.ValidationError({'tags': 'Each tag must be a string.'})
 
-            value = item.strip().lower()
+            value = item.strip().lower() # Check for whitespace + to lowercase to avoid duplicates like "Test" vs "test"
             if not value:
                 continue
 
-            if value in seen:
+            if value in seen: # Avoid duplicate tags
                 continue
             seen.add(value)
 
