@@ -169,8 +169,13 @@ class AuthToken(models.Model):
 
 
 class Tag(models.Model):
-    value = models.CharField(max_length=255, unique=True)
+    value = models.CharField(max_length=100, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if isinstance(self.value, str):
+            self.value = self.value.strip().lower()
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ["value"]

@@ -16,35 +16,73 @@ class EntrySerializer(serializers.ModelSerializer):
     author = serializers.StringRelatedField()
     tags = TagSerializer(many=True, read_only=True)
     tag_ids = serializers.PrimaryKeyRelatedField(
-        many=True, 
-        queryset=Tag.objects.all(), 
+        many=True,
+        queryset=Tag.objects.all(),
         source='tags',
         required=False,
         write_only=True
     )
     favorite = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Entry
         fields = ['id', 'title', 'body', 'shared', 'author', 'tags', 'tag_ids', 'favorite', 'created_at', 'last_edited']
         read_only_fields = ['id', 'author', 'favorite', 'created_at', 'last_edited']
-    
+
     def get_favorite(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             return Favorite.objects.filter(user=request.user, entry=obj).exists()
         return False
-    
+
+    def _resolve_tags_from_input(self, validated_data):
+        # 1) Preferred: tag_ids input (mapped to 'tags')
+        tags_from_ids = validated_data.pop('tags', None)
+        if tags_from_ids is not None:
+            return list(tags_from_ids)
+
+        # 2) Fallback: raw "tags": ["Tes", ...] from frontend (Less efficient.)
+        raw_tags = self.initial_data.get('tags', None)
+        if raw_tags is None:
+            return None
+
+        if isinstance(raw_tags, str):
+            raw_tags = [raw_tags]
+
+        if not isinstance(raw_tags, list):
+            raise serializers.ValidationError({'tags': 'Must be a list of tag strings.'})
+
+        resolved = []
+        seen = set()
+        for item in raw_tags:
+            if not isinstance(item, str):
+                raise serializers.ValidationError({'tags': 'Each tag must be a string.'})
+
+            value = item.strip().lower() # Check for whitespace + to lowercase to avoid duplicates like "Test" vs "test"
+            if not value:
+                continue
+
+            if value in seen: # Avoid duplicate tags
+                continue
+            seen.add(value)
+
+            tag, _ = Tag.objects.get_or_create(value=value)
+            resolved.append(tag)
+
+        return resolved
+
     def create(self, validated_data):
-        tags = validated_data.pop('tags', [])
+        tags = self._resolve_tags_from_input(validated_data)
         entry = Entry.objects.create(**validated_data)
-        entry.tags.set(tags)
+        if tags is not None:
+            entry.tags.set(tags)
         return entry
-    
+
     def update(self, instance, validated_data):
-        tags = validated_data.pop('tags', [])
+        tags = self._resolve_tags_from_input(validated_data)
         instance = super().update(instance, validated_data)
-        instance.tags.set(tags)
+        if tags is not None:
+            instance.tags.set(tags)
         return instance
 
 
