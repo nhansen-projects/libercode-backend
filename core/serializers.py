@@ -22,11 +22,15 @@ class EntrySerializer(serializers.ModelSerializer):
         required=False,
         write_only=True
     )
+    document = serializers.JSONField(required=False, allow_null=True)
     favorite = serializers.SerializerMethodField()
 
     class Meta:
         model = Entry
-        fields = ['id', 'title', 'body', 'shared', 'author', 'tags', 'tag_ids', 'favorite', 'created_at', 'last_edited']
+        fields = [
+            'id', 'title', 'body', 'document', 'shared', 'author',
+            'tags', 'tag_ids', 'favorite', 'created_at', 'last_edited'
+        ]
         read_only_fields = ['id', 'author', 'favorite', 'created_at', 'last_edited']
 
     def get_favorite(self, obj):
