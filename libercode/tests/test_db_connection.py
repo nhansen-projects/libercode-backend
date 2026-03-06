@@ -13,14 +13,20 @@ django.setup()
 
 from django.db import connection
 from django.db.utils import OperationalError
+import pytest
 
+@pytest.mark.django_db
 def test_connection():
     # Attempt to connect to the database
     with connection.cursor() as cursor:
-        cursor.execute("SELECT version();")
+        if connection.vendor == 'sqlite':
+            cursor.execute("SELECT sqlite_version();")
+        else:
+            cursor.execute("SELECT version();")
         version = cursor.fetchone()
-        print("✓ Database connection successful!")
-        print(f"✓ PostgreSQL version: {version[0]}")
+        assert version is not None, "Failed to fetch database version"
+        print(f"✓ Database connection successful! ({connection.vendor})")
+        print(f"✓ Database version: {version[0]}")
 
 if __name__ == "__main__":
     print("Testing database connection...")
