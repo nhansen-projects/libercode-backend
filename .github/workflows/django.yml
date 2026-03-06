@@ -34,8 +34,10 @@ jobs:
 
       - name: Run Security Scan - pip-audit
         run: |
-          pip-audit
-
+                pip-audit
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        
       - name: Run Tests
         env:
           SECRET_KEY: "ci-not-a-real-secret"
