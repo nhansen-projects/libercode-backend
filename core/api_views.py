@@ -709,6 +709,8 @@ class LoginView(APIView):
 
 
 class LogoutView(APIView):
+    permission_classes = [permissions.AllowAny]
+
     def post(self, request):
         # Handle token-based authentication logout
         auth_header = request.headers.get('Authorization')

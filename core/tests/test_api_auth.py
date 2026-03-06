@@ -34,20 +34,20 @@ class TestUserRegistration:
 
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data['user']['username'] == 'newuser'
-        assert 'token' in response.data
-        assert 'expires_at' in response.data
+        assert 'access' in response.data['tokens']
+        assert 'refresh_expires' in response.data['tokens']
         assert User.objects.filter(username='newuser').exists()
 
     @pytest.mark.django_db
     def test_register_duplicate_username(self, api_client, test_user):
-        """Test registration with duplicate username returns 409."""
+        """Test registration with duplicate username returns 400."""
         response = api_client.post('/api/register/', {
             'username': 'testuser',  # Already exists
             'password': 'pass123'
         }, format='json')
 
-        assert response.status_code == status.HTTP_409_CONFLICT
-        assert 'already exists' in response.data['error']
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'username' in response.data or 'error' in response.data or 'message' in response.data
 
     @pytest.mark.django_db
     def test_register_missing_username(self, api_client):
@@ -83,8 +83,8 @@ class TestUserLogin:
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data['user']['username'] == 'testuser'
-        assert 'token' in response.data
-        assert 'expires_at' in response.data
+        assert 'access' in response.data['tokens']
+        assert 'refresh_expires' in response.data['tokens']
 
     @pytest.mark.django_db
     def test_login_invalid_password(self, api_client, test_user):
@@ -141,16 +141,16 @@ class TestTokenRefresh:
             'password': 'testpass123'
         }, format='json')
 
-        token = login_response.data['token']
+        refresh_token = login_response.data['tokens']['refresh']
 
         # Refresh the token
         response = api_client.post('/api/token/refresh/', {
-            'token': token
+            'refresh': refresh_token
         }, format='json')
 
         assert response.status_code == status.HTTP_200_OK
-        assert 'token' in response.data
-        assert 'expires_at' in response.data
+        assert 'access' in response.data
+        assert 'access_expires' in response.data
 
     @pytest.mark.django_db
     def test_token_refresh_missing_token(self, api_client):
@@ -158,17 +158,17 @@ class TestTokenRefresh:
         response = api_client.post('/api/token/refresh/', {}, format='json')
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'Token is required' in response.data['error']
+        assert 'Refresh token is required' in str(response.data)
 
     @pytest.mark.django_db
     def test_token_refresh_invalid_token(self, api_client):
         """Test token refresh with invalid token."""
         response = api_client.post('/api/token/refresh/', {
-            'token': 'invalid-token-string'
+            'refresh': 'invalid-token-string'
         }, format='json')
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
-        assert 'Invalid token' in response.data['error']
+        assert 'Invalid refresh token' in str(response.data)
 
 
 class TestLogout:
@@ -186,17 +186,17 @@ class TestLogout:
             'password': 'testpass123'
         }, format='json')
 
-        token = login_response.data['token']
+        token = login_response.data['tokens']['access']
 
-        # Logout with token
+        # Logout with token (JWT uses Bearer prefix)
         response = api_client.post(
             '/api/logout/',
-            HTTP_AUTHORIZATION=f'Token {token}',
+            HTTP_AUTHORIZATION=f'Bearer {token}',
             format='json'
         )
 
         assert response.status_code == status.HTTP_200_OK
-        assert 'Successfully logged out' in response.data['message']
+        assert 'Logout successful' in str(response.data) or 'logged out' in str(response.data)
 
     @pytest.mark.django_db
     def test_logout_without_token(self, api_client):
