@@ -1,11 +1,13 @@
 asgiref==3.7.2
 sqlparse==0.5.5
-Django==5.0.6
+Django==5.1.14,<5.2.0
 psycopg2-binary==2.9.9
 pip
-djangorestframework==3.15.1
-djangorestframework-simplejwt==5.3.1
+djangorestframework>=3.15.2
+djangorestframework-simplejwt>=5.5.1
 django-cors-headers==4.3.1
 django-filter==24.3
 drf-yasg==1.21.7
 cryptography==46.0.5
+
+djangorestframework
