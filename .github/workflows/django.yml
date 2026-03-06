@@ -43,8 +43,8 @@ jobs:
           
       - name: Run Tests
         env:
-          SECRET_KEY: "ci-not-a-real-secret"
-          JWT_SIGNING_KEY: "ci-jwt-signing-key"
+          SECRET_KEY: "ci-not-a-real-secret-32bytes-long!!!"
+          JWT_SIGNING_KEY: "ci-jwt-signing-key-32bytes-minimum!!"
           DEBUG: "False"
         run: |
           pytest -q
