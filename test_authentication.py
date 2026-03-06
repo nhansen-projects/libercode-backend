@@ -4,6 +4,7 @@ import os
 import sys
 import django
 import json
+import pytest
 
 # Setup Django
 sys.path.insert(0, '/home/nh/workspace/libercode-backend')
@@ -15,6 +16,7 @@ from core.api_views import UserCreateView, LoginView
 from core.models import User, EncryptionKey
 from core.utils import SecurityUtils
 
+@pytest.mark.django_db
 def test_authentication_flow():
     print("Testing authentication flow...")
     
