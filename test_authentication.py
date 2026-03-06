@@ -7,7 +7,8 @@ import json
 import pytest
 
 # Setup Django
-sys.path.insert(0, '/home/nh/workspace/libercode-backend')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BASE_DIR)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'libercode.settings')
 django.setup()
 
