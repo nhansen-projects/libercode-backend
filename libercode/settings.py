@@ -13,7 +13,10 @@ if not SECRET_KEY:
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Security: Restrict allowed hosts to prevent host header attacks
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.environ.get(
+    'ALLOWED_HOSTS',
+    'localhost,127.0.0.1,libercode.augustdev.work'
+).split(',')
 
 
 # Application definition
@@ -177,7 +180,10 @@ def get_cors_origins(is_debug):
     protocol = "http://" if is_debug else "https://"
     return [f"{protocol}{origin}" for origin in base_origins]
 
-CORS_ALLOWED_ORIGINS = get_cors_origins(DEBUG)
+CORS_ALLOWED_ORIGINS = os.environ.get(
+    'CORS_ALLOWED_ORIGINS',
+    ','.join(get_cors_origins(DEBUG))
+).split(',')
 
 CORS_ALLOW_METHODS = [
     "DELETE",
@@ -199,9 +205,8 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
 ]
-# TODO: DEV ONLY - REMOVE IN PRODUCTION!!!
-# should be Disabled for security - use explicit allowed origins only
-CORS_ALLOW_ALL_ORIGINS = True  # TODO: Allow only in development
+# Use explicit origins by default. Only set true explicitly for local debugging.
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'
 
 CORS_ALLOW_CREDENTIALS = False
 
@@ -214,6 +219,12 @@ SIMPLE_AUTH = {
 
 # For dev http
 SECURE_SSL_REDIRECT = False
+
+# Keep CSRF origins configurable when frontend and backend are on different ports.
+CSRF_TRUSTED_ORIGINS = os.environ.get(
+    'CSRF_TRUSTED_ORIGINS',
+    ','.join(CORS_ALLOWED_ORIGINS)
+).split(',')
 
 # HTTPS and security headers
 """

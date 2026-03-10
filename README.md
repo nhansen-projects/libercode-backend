@@ -32,6 +32,6 @@ docker compose logs web
 docker compose down
 ```
 The application will be available at:
-- Web Interface: `http://localhost:8000`
-- API: `http://localhost:8000/api/entries/`
-- Admin: `http://localhost:8000/admin/`
+- Frontend: `http://libercode.augustdev.work:8090`
+- API: `http://libercode.augustdev.work:8080/api/entries/`
+- Admin: `http://libercode.augustdev.work:8080/admin/`
