@@ -169,8 +169,13 @@ class AuthToken(models.Model):
 
 
 class Tag(models.Model):
-    value = models.CharField(max_length=255, unique=True)
+    value = models.CharField(max_length=100, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if isinstance(self.value, str):
+            self.value = self.value.strip().lower()
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ["value"]
@@ -185,6 +190,7 @@ class Tag(models.Model):
 class Entry(models.Model):
     title = models.CharField(max_length=255)
     body = models.TextField(help_text="Content of the post")
+    document = models.JSONField(null=True, blank=True)  # rich-text JSON document
     shared = models.BooleanField(default=False)
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
