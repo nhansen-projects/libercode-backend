@@ -211,6 +211,9 @@ class Entry(models.Model):
     def __str__(self) -> str:
         return self.title
 
+    def is_owned_by(self, user):
+        return self.author == user
+
 
 class Favorite(models.Model):
     user = models.ForeignKey(

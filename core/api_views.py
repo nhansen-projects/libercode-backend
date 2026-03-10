@@ -92,7 +92,9 @@ class EntryListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        queryset = Entry.objects.filter(author=self.request.user).select_related('author').prefetch_related('tags')
+        queryset = Entry.objects.filter(
+            Q(author=self.request.user) | Q(shared=True)
+        ).select_related('author').prefetch_related('tags')
 
         tag = self.request.query_params.get('tag', None)
         if tag:
@@ -114,7 +116,14 @@ class EntryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Entry.objects.filter(author=self.request.user)
+        return Entry.objects.filter(
+            Q(author=self.request.user) | Q(shared=True)
+        )
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if request.method not in permissions.SAFE_METHODS and obj.author != request.user:
+            self.permission_denied(request, message="You do not have permission to edit this entry.")
 
     def perform_update(self, serializer):
         serializer.save()
