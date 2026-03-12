@@ -9,5 +9,5 @@ django-cors-headers==4.3.1
 django-filter==24.3
 drf-yasg==1.21.7
 cryptography==46.0.5
-
 djangorestframework
+gunicorn==23.0.0

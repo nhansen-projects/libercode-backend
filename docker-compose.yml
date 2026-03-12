@@ -8,9 +8,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d notesDB"]
+      test: ["CMD-SHELL", "pg_isready -d notesDB"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -19,7 +19,7 @@ services:
   web:
     build: .
     working_dir: /app
-    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:8080"
+    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn libercode.wsgi:application --bind 0.0.0.0:8080 --workers 3"
     volumes:
       - .:/app
     ports:
@@ -30,7 +30,7 @@ services:
       - DB_NAME=notesDB
       - DB_USER=postgres
       - DB_PASSWORD=password
-      - DEBUG=1
+      - DEBUG=0
       - SECRET_KEY=njjkpSDk$$3OUXNf!A7#53OD7MbHKBgQITGZhMrYDj0DyP$$zcJC
       - JWT_SIGNING_KEY=6bb3ac489638886394c48f4d7292f34a97dba2fa96f90b082cdcfdfc59904be5
       - ALLOWED_HOSTS=localhost,127.0.0.1,libercode.augustdev.work

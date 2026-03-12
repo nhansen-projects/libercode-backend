@@ -10,7 +10,7 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY must be set in environment variables for security reasons")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't', 'y', 'yes')
 
 # Security: Restrict allowed hosts to prevent host header attacks
 ALLOWED_HOSTS = os.environ.get(

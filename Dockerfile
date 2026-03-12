@@ -18,5 +18,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Use direct command to start application
-CMD ["sh", "-c", "python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:8000"]
+# Use gunicorn to start application in production
+CMD ["sh", "-c", "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn libercode.wsgi:application --bind 0.0.0.0:8080 --workers 3"]
