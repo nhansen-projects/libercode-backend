@@ -8,7 +8,7 @@ def run_db_query(query):
     try:
         cmd = [
             'docker', 'exec', 'libercode-backend-db-1', 
-            'psql', '-U', 'admin', '-d', 'notesDB', '-c', query
+            'psql', '-U', 'postgres', '-d', 'notesDB', '-c', query
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
