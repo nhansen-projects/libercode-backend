@@ -227,7 +227,6 @@ CSRF_TRUSTED_ORIGINS = os.environ.get(
 ).split(',')
 
 # HTTPS and security headers
-"""
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = (os.environ.get('SECURE_SSL_REDIRECT', 'True') == 'True') if not DEBUG else False
 SESSION_COOKIE_SECURE = not DEBUG
@@ -238,7 +237,3 @@ SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = 'no-referrer'
 X_FRAME_OPTIONS = 'DENY'
-
-# Trust these origins for CSRF (needed when using HTTPS and different domain/port frontends)
-CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', ','.join(CORS_ALLOWED_ORIGINS)).split(',')
-"""
