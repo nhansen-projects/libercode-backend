@@ -1,7 +1,7 @@
 # Docker Configuration Troubleshooting Guide
               
-For all intents and purposes, the docker files should work out of the box, but since we've experienced issues with Docker and Docker Compose over the course of development, we've compiled this guide as references to troubleshoot common problems in development environments.
-Please note that this is intended for development builds and not for production use. If things don't work out of the box for prod, there are likely far more important issues to resolve, and it should not be used in any kind of production.
+For all intents and purposes, the docker files should work out of the box, but since we've experienced issues with Docker and Docker Compose over the course of development, we've compiled this guide as references to troubleshoot common problems.
+The project is now configured for production using Gunicorn as the WSGI server.
 
 ## Common Issues and Solutions
 
@@ -59,8 +59,8 @@ services:
 Check if variables are available in the container:
 
 ```bash
-docker-compose run web sh -c "env | grep SECRET_KEY"
-docker-compose run web sh -c "python -c 'import os; print(os.environ.get(\"SECRET_KEY\"))'"
+docker compose run web sh -c "env | grep SECRET_KEY"
+docker compose run web sh -c "python -c 'import os; print(os.environ.get(\"SECRET_KEY\"))'"
 ```
 
 #### Solution D: Use alternative Dockerfile (for development only)
@@ -102,7 +102,7 @@ docker-compose build --no-cache
 Check if the database container is running:
 
 ```bash
-docker-compose ps
+docker compose ps
 docker logs libercode-backend-db-1
 ```
 
@@ -116,7 +116,7 @@ Ensure your database credentials match between:
 Connect to the database manually:
   
 ```bash
-docker-compose exec db psql -U postgres -d notesDB
+docker compose exec db psql -U postgres -d notesDB
 ```
 
 #### Solution D: Increase database startup time
@@ -144,27 +144,38 @@ These errors occur due to mismatches between the expected database user/password
 
 We have updated the project to use the default `postgres` user with the password `password`. If you still see these errors, your existing Docker volume is still using the old credentials.
 
-#### How to Fix on a Deployed Server:
+#### Path C: External Connection Attempts (Security)
 
-The `POSTGRES_USER` and `POSTGRES_PASSWORD` settings only work during the **first time** the database is created. To apply the change to an existing deployment, you must reset the database volume OR manually update the role.
+If your Django application starts successfully and you see "Applying migrations... OK" in the `web` logs, but later see `FATAL: password authentication failed for user "postgres"` in the `db` logs, it is very likely that **external bots or scanners** are trying to connect to your database from the internet.
+
+By default, exposing port `5432:5432` on a public server allows anyone to try and guess your database password.
+
+**To fix this:**
+1.  Update `docker-compose.yml` to bind the database port only to the local machine:
+    ```yaml
+    db:
+      ports:
+        - "127.0.0.1:5432:5432"
+    ```
+2.  Or remove the `ports` mapping entirely if you only need the Django app to connect to the database (it uses the internal Docker network).
 
 **⚠️ WARNING: Resetting will delete all data in your database.**
 
-##### Path A: Resetting the Volume (Recommended for Clean Starts)
+#### Path A: Resetting the Volume (Recommended for Clean Starts)
 
 1.  Stop the containers and remove the volumes:
     ```bash
-    docker-compose down -v
+    docker compose down -v
     ```
 
 2.  Start the containers again (this will re-initialize the DB with the `postgres` user and `password` password):
     ```bash
-    docker-compose up -d
+    docker compose up -d
     ```
 
 3.  Check the logs to confirm the error is gone:
     ```bash
-    docker-compose logs -f db
+    docker compose logs -f db
     ```
 
 ##### Path B: Manual Update (No Data Loss)
@@ -209,13 +220,13 @@ If you want to skip `collectstatic` during development, you can modify the `comm
 
 #### Check environment variables in container:
 ```bash
-docker-compose run web env
-docker-compose run web sh -c "printenv"
+docker compose run web env
+docker compose run web sh -c "printenv"
 ```
 
 #### Test Django settings directly:
 ```bash
-docker-compose run web python -c "
+docker compose run web python -c "
 import os
 import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'libercode.settings')
@@ -228,7 +239,7 @@ print('DEBUG:', settings.DEBUG)
 
 #### Check database connection:
 ```bash
-docker-compose run web python -c "
+docker compose run web python -c "
 import os
 import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'libercode.settings')
@@ -243,17 +254,17 @@ print('Database connection successful:', connection.ensure_connection())
 Sometimes a clean start helps:
 
 ```bash
-# Stop and remove all containers
-docker-compose down -v
+# Stop and remove all containers and volumes
+docker compose down -v
 
 # Remove old images
 docker rmi libercode-backend-web
 
 # Build fresh
-docker-compose build --no-cache
+docker compose build --no-cache
 
 # Start with clean state
-docker-compose up
+docker compose up -d
 ```
 
 ### 8. Alternative Development Setup
@@ -286,8 +297,8 @@ docker-compose up
 
 If you're still experiencing issues:
 
-1. Check the logs: `docker-compose logs web`
-2. Check database logs: `docker-compose logs db`
+1. Check the logs: `docker compose logs web`
+2. Check database logs: `docker compose logs db`
 3. Try the alternative Dockerfile for development
 4. Ensure all environment variables are correctly set
 5. Verify your Docker and Docker Compose versions are up to date
