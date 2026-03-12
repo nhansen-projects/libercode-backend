@@ -119,14 +119,27 @@ Connect to the database manually:
 docker-compose exec db psql -U admin -d notesDB
 ```
 
-#### Solution D: Increase database startup time
-If the database takes longer to start, you can adjust the `healthcheck` settings in `docker-compose.yml`:
+#### Solution E: Authentication Timeout Issues
+
+**Symptoms:**
+- `FATAL: canceling authentication due to timeout` in database logs
+- Application hangs or fails to connect during startup
+
+**Solution:**
+This can occur if the database is under high load or is taking too long to process authentication during its initial startup. We've increased the `authentication_timeout` in `docker-compose.yml` to 120 seconds. 
+
+You can also try increasing the healthcheck retries in `docker-compose.yml`:
 ```yaml
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d notesDB"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 10
+```
+
+And adding a small delay to the web service command:
+```yaml
+    command: sh -c "sleep 5 && python manage.py migrate && ..."
 ```
 
 ### 4. Static Files Collection Issues
