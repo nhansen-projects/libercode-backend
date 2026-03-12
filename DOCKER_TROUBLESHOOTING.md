@@ -26,7 +26,7 @@ services:
       - ALLOWED_HOSTS=localhost,127.0.0.1
       - DB_HOST=db
       - DB_NAME=notesDB
-      - DB_USER=admin
+      - DB_USER=postgres
       - DB_PASSWORD=password
 ```
 
@@ -40,7 +40,7 @@ SECRET_KEY=your-secret-key-here
 JWT_SIGNING_KEY=your-jwt-key-here
 ALLOWED_HOSTS=localhost,127.0.0.1
 DB_NAME=notesDB
-DB_USER=admin
+DB_USER=postgres
 DB_PASSWORD=password
 DB_HOST=db
 DB_PORT=5432
@@ -114,22 +114,72 @@ Ensure your database credentials match between:
 
 #### Solution C: Manual database check
 Connect to the database manually:
-
+  
 ```bash
-docker-compose exec db psql -U admin -d notesDB
+docker-compose exec db psql -U postgres -d notesDB
 ```
 
 #### Solution D: Increase database startup time
 If the database takes longer to start, you can adjust the `healthcheck` settings in `docker-compose.yml`:
 ```yaml
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d notesDB"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d notesDB"]
       interval: 10s
       timeout: 5s
       retries: 10
 ```
 
-### 4. Static Files Collection Issues
+### 4. Password Authentication Failed / Role "postgres" does not exist
+
+**Symptoms:**
+- Database logs show `FATAL: password authentication failed for user "postgres"`
+- Database logs show `FATAL: role "postgres" does not exist`
+- Connection failures when using standard PostgreSQL tools
+
+**Solution:**
+These errors occur due to mismatches between the expected database user/password and what is actually stored in the persistent Docker volume.
+
+1. **Role "postgres" does not exist**: This happens when `POSTGRES_USER` was initially set to something other than `postgres` (like `admin`). The default user is not created if a custom one is specified.
+2. **Password authentication failed**: This happens when the `DB_PASSWORD` in your `.env` or `docker-compose.yml` does not match the password used when the database was first initialized.
+
+We have updated the project to use the default `postgres` user with the password `password`. If you still see these errors, your existing Docker volume is still using the old credentials.
+
+#### How to Fix on a Deployed Server:
+
+The `POSTGRES_USER` and `POSTGRES_PASSWORD` settings only work during the **first time** the database is created. To apply the change to an existing deployment, you must reset the database volume OR manually update the role.
+
+**⚠️ WARNING: Resetting will delete all data in your database.**
+
+##### Path A: Resetting the Volume (Recommended for Clean Starts)
+
+1.  Stop the containers and remove the volumes:
+    ```bash
+    docker-compose down -v
+    ```
+
+2.  Start the containers again (this will re-initialize the DB with the `postgres` user and `password` password):
+    ```bash
+    docker-compose up -d
+    ```
+
+3.  Check the logs to confirm the error is gone:
+    ```bash
+    docker-compose logs -f db
+    ```
+
+##### Path B: Manual Update (No Data Loss)
+
+If you cannot delete the data, you must manually create/update the `postgres` role inside the running container using the OLD credentials (e.g., if your old user was `admin` and password was `admin`):
+
+```bash
+# Create the postgres role if it doesn't exist
+docker-compose exec db psql -U admin -d notesDB -c "CREATE ROLE postgres WITH LOGIN SUPERUSER PASSWORD 'password';"
+
+# OR update the password if the role exists but authentication fails
+docker-compose exec db psql -U postgres -d notesDB -c "ALTER ROLE postgres WITH PASSWORD 'password';"
+```
+
+### 5. Static Files Collection Issues
 
 **Symptoms:**
 - `collectstatic` command fails
@@ -155,7 +205,7 @@ RUN mkdir -p /app/staticfiles
 #### Solution C: Skip collectstatic in development
 If you want to skip `collectstatic` during development, you can modify the `command` in `docker-compose.yml` to remove it.
 
-### 5. Debugging Tips
+### 6. Debugging Tips
 
 #### Check environment variables in container:
 ```bash
@@ -188,7 +238,7 @@ print('Database connection successful:', connection.ensure_connection())
 "
 ```
 
-### 6. Clean Build and Start
+### 7. Clean Build and Start
 
 Sometimes a clean start helps:
 
@@ -206,7 +256,7 @@ docker-compose build --no-cache
 docker-compose up
 ```
 
-### 7. Alternative Development Setup
+### 8. Alternative Development Setup
 
 For faster development, use the alternative Dockerfile:
 

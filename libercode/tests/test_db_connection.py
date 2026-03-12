@@ -33,7 +33,7 @@ if __name__ == "__main__":
     print(f"Host: {os.environ.get('DB_HOST', 'db')}")
     print(f"Port: {os.environ.get('DB_PORT', '5432')}")
     print(f"Database: {os.environ.get('DB_NAME', 'notesDB')}")
-    print(f"User: {os.environ.get('DB_USER', 'admin')}")
+    print(f"User: {os.environ.get('DB_USER', 'postgres')}")
     print("-" * 50)
 
     try:
