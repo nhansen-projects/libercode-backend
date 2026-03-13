@@ -19,7 +19,7 @@ services:
   web:
     build: .
     working_dir: /app
-    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn libercode.wsgi:application --bind 0.0.0.0:8080 --workers 3"
+    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn libercode.wsgi:application --bind 0.0.0.0:8080 --workers 3 --access-logfile -"
     volumes:
       - .:/app
     ports:
@@ -31,11 +31,12 @@ services:
       - DB_USER=postgres
       - DB_PASSWORD=password
       - DEBUG=0
+      - SECURE_SSL_REDIRECT=0
       - SECRET_KEY=njjkpSDk$$3OUXNf!A7#53OD7MbHKBgQITGZhMrYDj0DyP$$zcJC
       - JWT_SIGNING_KEY=6bb3ac489638886394c48f4d7292f34a97dba2fa96f90b082cdcfdfc59904be5
-      - ALLOWED_HOSTS=localhost,127.0.0.1,libercode.augustdev.work
-      - CORS_ALLOWED_ORIGINS=https://libercode.augustdev.work,https://libercode.augustdev.work:8090,https://libercode.augustdev.work:8080
-      - CSRF_TRUSTED_ORIGINS=https://libercode.augustdev.work,https://libercode.augustdev.work:8090,https://libercode.augustdev.work:8080
+      - ALLOWED_HOSTS=localhost,127.0.0.1,libercode.augustdev.work,187.77.88.100
+      - CORS_ALLOWED_ORIGINS=https://libercode.augustdev.work,http://libercode.augustdev.work:8090,https://libercode.augustdev.work:8090,http://187.77.88.100:8090,https://187.77.88.100:8090,http://localhost:8090,http://127.0.0.1:8090,https://localhost:8090,https://127.0.0.1:8090
+      - CSRF_TRUSTED_ORIGINS=https://libercode.augustdev.work,http://libercode.augustdev.work:8090,https://libercode.augustdev.work:8090,http://187.77.88.100:8090,https://187.77.88.100:8090,http://localhost:8090,http://127.0.0.1:8090,https://localhost:8090,https://127.0.0.1:8090
       - PYTHONUNBUFFERED=1
     depends_on:
       db:

@@ -15,7 +15,7 @@ DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't', 'y', 'yes
 # Security: Restrict allowed hosts to prevent host header attacks
 ALLOWED_HOSTS = os.environ.get(
     'ALLOWED_HOSTS',
-    'localhost,127.0.0.1,libercode.augustdev.work'
+    'localhost,127.0.0.1,libercode.augustdev.work,187.77.88.100'
 ).split(',')
 
 
@@ -176,6 +176,10 @@ def get_cors_origins(is_debug):
         "127.0.0.1:8000",
         "localhost:36661",  # Flutter dev server port
         "127.0.0.1:36661",
+        "localhost:8090",  # Flutter web dev port
+        "127.0.0.1:8090",
+        "187.77.88.100:8080",
+        "187.77.88.100:8090",
     ]
     protocol = "http://" if is_debug else "https://"
     return [f"{protocol}{origin}" for origin in base_origins]
@@ -217,9 +221,6 @@ SIMPLE_AUTH = {
     'REFRESH_TOKEN_LIFETIME': 86400,  # 1 day in seconds
 }
 
-# For dev http
-SECURE_SSL_REDIRECT = False
-
 # Keep CSRF origins configurable when frontend and backend are on different ports.
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     'CSRF_TRUSTED_ORIGINS',
@@ -228,7 +229,7 @@ CSRF_TRUSTED_ORIGINS = os.environ.get(
 
 # HTTPS and security headers
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = (os.environ.get('SECURE_SSL_REDIRECT', 'True') == 'True') if not DEBUG else False
+SECURE_SSL_REDIRECT = (os.environ.get('SECURE_SSL_REDIRECT', 'True').lower() in ('true', '1', 't', 'y', 'yes')) if not DEBUG else False
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000')) if not DEBUG else 0
