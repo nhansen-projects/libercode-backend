@@ -1,19 +1,37 @@
 import os
 from pathlib import Path
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def to_bool(value, default=False):
+    if value is None:
+        return default
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+APP_ENV = os.environ.get('APP_ENV', 'dev').strip().lower()
+IS_PRODUCTION = APP_ENV in {'prod', 'production'}
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('SECRET_KEY')
 if not SECRET_KEY:
-    raise ValueError("SECRET_KEY must be set in environment variables for security reasons")
+    if IS_PRODUCTION:
+        raise ValueError("SECRET_KEY must be set in production")
+    SECRET_KEY = 'django-insecure-dev-only-change-this'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+DEBUG = to_bool(os.environ.get('DEBUG'), default=not IS_PRODUCTION)
 
 # Security: Restrict allowed hosts to prevent host header attacks
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+default_allowed_hosts = 'localhost,127.0.0.1'
+allowed_hosts_value = os.environ.get('ALLOWED_HOSTS', default_allowed_hosts)
+ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_value.split(',') if host.strip()]
+
+if IS_PRODUCTION and not ALLOWED_HOSTS:
+    raise ValueError("ALLOWED_HOSTS must be set in production")
 
 
 # Application definition
@@ -129,8 +147,6 @@ AUTHENTICATION_BACKENDS = [
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
@@ -139,16 +155,13 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
 }
 
-# JWT Settings
-from datetime import timedelta
-
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),  # Shorter lifetime for security
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',
-    'SIGNING_KEY': os.environ.get('JWT_SIGNING_KEY'),
+    'SIGNING_KEY': os.environ.get('JWT_SIGNING_KEY') or (None if IS_PRODUCTION else SECRET_KEY),
     'VERIFYING_KEY': None,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'USER_ID_FIELD': 'id',
@@ -158,7 +171,7 @@ SIMPLE_JWT = {
 
 # Validate JWT signing key
 if not SIMPLE_JWT['SIGNING_KEY']:
-    raise ValueError("JWT_SIGNING_KEY must be set in environment variables for security reasons")
+    raise ValueError("JWT_SIGNING_KEY must be set in production")
 
 # CORS settings - restrictive by default for security
 def get_cors_origins(is_debug):
@@ -179,6 +192,10 @@ def get_cors_origins(is_debug):
 
 CORS_ALLOWED_ORIGINS = get_cors_origins(DEBUG)
 
+cors_origins_from_env = os.environ.get('CORS_ALLOWED_ORIGINS', '').strip()
+if cors_origins_from_env:
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_from_env.split(',') if origin.strip()]
+
 CORS_ALLOW_METHODS = [
     "DELETE",
     "GET",
@@ -196,12 +213,9 @@ CORS_ALLOW_HEADERS = [
     "dnt",
     "origin",
     "user-agent",
-    "x-csrftoken",
     "x-requested-with",
 ]
-# TODO: DEV ONLY - REMOVE IN PRODUCTION!!!
-# should be Disabled for security - use explicit allowed origins only
-CORS_ALLOW_ALL_ORIGINS = True  # TODO: Allow only in development
+CORS_ALLOW_ALL_ORIGINS = DEBUG
 
 CORS_ALLOW_CREDENTIALS = False
 
@@ -212,16 +226,11 @@ SIMPLE_AUTH = {
     'REFRESH_TOKEN_LIFETIME': 86400,  # 1 day in seconds
 }
 
-# For dev http
-SECURE_SSL_REDIRECT = False
-
-# HTTPS and security headers
-"""
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = (os.environ.get('SECURE_SSL_REDIRECT', 'True') == 'True') if not DEBUG else False
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
-SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000')) if not DEBUG else 0
+SECURE_SSL_REDIRECT = to_bool(os.environ.get('SECURE_SSL_REDIRECT'), default=IS_PRODUCTION)
+SESSION_COOKIE_SECURE = IS_PRODUCTION
+CSRF_COOKIE_SECURE = IS_PRODUCTION
+SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000')) if IS_PRODUCTION else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
@@ -230,4 +239,3 @@ X_FRAME_OPTIONS = 'DENY'
 
 # Trust these origins for CSRF (needed when using HTTPS and different domain/port frontends)
 CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', ','.join(CORS_ALLOWED_ORIGINS)).split(',')
-"""

@@ -1,45 +1,64 @@
 services:
-  db:
+  db-dev:
+    profiles: ["dev"]
     image: postgres:15
     command: postgres -c "authentication_timeout=120"
-    environment:
-      POSTGRES_DB: notesDB
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
+    env_file:
+      - .env.dev
     volumes:
-      - postgres_data:/var/lib/postgresql/data/
-    ports:
-      - "5432:5432"
+      - postgres_dev_data:/var/lib/postgresql/data/
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d notesDB"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 10s
       retries: 10
     restart: unless-stopped
 
-  web:
+  web-dev:
+    profiles: ["dev"]
     build: .
     working_dir: /app
-    command: sh -c "sleep 5 && python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:8000"
+    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
     ports:
       - "8000:8000"
-    environment:
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_NAME=notesDB
-      - DB_USER=admin
-      - DB_PASSWORD=password
-      - DEBUG=1
-      - SECRET_KEY=njjkpSDk$$3OUXNf!A7#53OD7MbHKBgQITGZhMrYDj0DyP$$zcJC
-      - JWT_SIGNING_KEY=6bb3ac489638886394c48f4d7292f34a97dba2fa96f90b082cdcfdfc59904be5
-      - ALLOWED_HOSTS=localhost,127.0.0.1
-      - PYTHONUNBUFFERED=1
+    env_file:
+      - .env.dev
     depends_on:
-      db:
+      db-dev:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db-prod:
+    profiles: ["prod"]
+    image: postgres:15
+    command: postgres -c "authentication_timeout=120"
+    env_file:
+      - .env.prod
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+  web-prod:
+    profiles: ["prod"]
+    build: .
+    working_dir: /app
+    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8080:8000"
+    env_file:
+      - .env.prod
+    depends_on:
+      db-prod:
         condition: service_healthy
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  postgres_dev_data:
+  postgres_prod_data:
