@@ -10,7 +10,7 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY must be set in environment variables for security reasons")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't')
 
 # Security: Restrict allowed hosts to prevent host header attacks
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
@@ -174,8 +174,10 @@ def get_cors_origins(is_debug):
         "localhost:36661",  # Flutter dev server port
         "127.0.0.1:36661",
     ]
-    protocol = "http://" if is_debug else "https://"
-    return [f"{protocol}{origin}" for origin in base_origins]
+    origins = [f"http://{origin}" for origin in base_origins]
+    if not is_debug:
+        origins += [f"https://{origin}" for origin in base_origins]
+    return origins
 
 CORS_ALLOWED_ORIGINS = get_cors_origins(DEBUG)
 
