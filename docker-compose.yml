@@ -19,7 +19,7 @@ services:
   web:
     build: .
     working_dir: /app
-    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn libercode.wsgi:application --bind 0.0.0.0:8080 --workers 3 --access-logfile -"
+    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn libercode.wsgi:application --bind 0.0.0.0:8080 --workers 3 --access-logfile - --forwarded-allow-ips=\"*\""
     volumes:
       - .:/app
     ports:
