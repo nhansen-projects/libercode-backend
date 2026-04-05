@@ -24,15 +24,17 @@ class EntrySerializer(serializers.ModelSerializer):
     )
     document = serializers.JSONField(required=False, allow_null=True)
     favorite = serializers.SerializerMethodField()
-
+    is_owner = serializers.SerializerMethodField()
+    
     class Meta:
         model = Entry
-        fields = [
-            'id', 'title', 'body', 'document', 'shared', 'author',
-            'tags', 'tag_ids', 'favorite', 'created_at', 'last_edited'
-        ]
-        read_only_fields = ['id', 'author', 'favorite', 'created_at', 'last_edited']
+        fields = ['id', 'title', 'body', 'shared', 'author', 'tags', 'tag_ids', 'favorite', 'created_at', 'last_edited', 'is_owner']
+        read_only_fields = ['id', 'author', 'favorite', 'created_at', 'last_edited', 'is_owner']
 
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        return obj.is_owned_by(request.user) if request and request.user.is_authenticated else False
+    
     def get_favorite(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
